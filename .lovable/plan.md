@@ -1,59 +1,108 @@
+# Personal AI Workspace Plan
 
+Transform this remixed proposal app into a private, self-improving AI workspace.
 
-## Security Hardening Plan
+## Core Principle
 
-The security scan found 8 findings (2 errors, 4 warnings, 2 info). The existing RLS foundation is solid — all tables have RLS enabled, roles are in a separate table, and `has_role()`/`get_user_org_id()` security definer functions exist. Here's what needs hardening:
+No public LLM updates its own weights in real time. Instead, we build a **personal memory layer** (preferences, facts, chat history, feedback, documents) and feed it back into every model call. The model becomes more useful by seeing better context, not by changing itself. This is the same pattern Claude, Cursor, and ChatGPT use.
 
-### 1. Enable Leaked Password Protection
-Configure auth to reject passwords found in known breach databases.
+## Architecture
 
-### 2. Add Password Protection for Shared Proposals (Error)
-Shared proposals currently expose pricing and content to anyone with the link. Add optional password protection:
-- **Migration**: Add `share_password_hash` column to `proposals` table
-- **Edge function**: `verify-share-password` — accepts share_id + password, returns a signed short-lived token
-- **Update RLS**: Keep existing public SELECT for non-password-protected proposals; password-protected ones require verification through the edge function
-- **Frontend**: Update `PublicProposal.tsx` to show a password gate when `share_password_hash` is set; update `ProposalDetail.tsx` to let users set a share password
-
-### 3. Add Share Link Expiration (Error)
-- **Migration**: Add `share_expires_at` column to `proposals`
-- **Update RLS**: Modify "Anyone can view shared proposals" policy to check `share_expires_at IS NULL OR share_expires_at > now()`
-- **Frontend**: Add expiration date picker in proposal sharing UI
-
-### 4. Restrict Client Contact Info by Role (Warning)
-- Create a view `clients_public` that excludes `email` and `phone` for non-admin/manager users
-- Or add role-based filtering in the application layer since all org members currently see all client fields
-
-### 5. Anonymize IP in Proposal Events (Warning)
-- Truncate IP addresses before storing (remove last octet) in `PublicProposal.tsx`
-- Add a privacy notice to the public proposal page
-
-### 6. Align Proposal Version Access with Proposal Access (Info)
-- **Migration**: Update `proposal_versions` RLS to allow managers/admins to view versions of proposals they can access:
-```sql
-CREATE POLICY "Managers/admins can view org proposal versions"
-ON proposal_versions FOR SELECT
-USING (EXISTS (
-  SELECT 1 FROM proposals
-  WHERE proposals.id = proposal_versions.proposal_id
-  AND proposals.org_id = get_user_org_id(auth.uid())
-  AND (has_role(auth.uid(), 'admin') OR has_role(auth.uid(), 'manager'))
-));
+```text
++-------------+     +----------------+     +------------------+
+| Chat UI     | --> | Edge Function  | --> | Lovable AI       |
+| (streaming) |     | (tools, memory,|     | Gateway (GPT-5.6,|
+|             | <-- |  system prompt)|     | Gemini, etc.)    |
++-------------+     +----------------+     +------------------+
+       |                    |
+       v                    v
++-------------+     +----------------+
+| Chat history|     | Vector memory  |
+| Files       |     | Feedback       |
+| Preferences |     | Skills/MCPs    |
++-------------+     +----------------+
 ```
 
-### 7. Add Role Change Audit Logging (Info)
-- **Migration**: Create `audit_logs` table with RLS (admin SELECT only, insert via trigger)
-- **Migration**: Add trigger on `user_roles` for INSERT/UPDATE/DELETE that logs changes to `audit_logs`
+## Phase 1: Chat Foundation
 
-### 8. Input Validation & Frontend Security
-- Sanitize all user inputs before database writes (proposal content, client notes)
-- Add rate limiting awareness on auth pages (already handled by backend, but add UI feedback)
-- Ensure no sensitive data in localStorage beyond the session token
+Build a clean, Claude-like chat interface that replaces the current proposal app.
 
-### Files to Change
-- **Migrations**: 3-4 migrations for schema changes (share_password_hash, share_expires_at, audit_logs table + trigger, updated RLS policies)
-- **New edge function**: `verify-share-password`
-- **`src/pages/PublicProposal.tsx`**: Password gate, IP anonymization, privacy notice
-- **`src/pages/ProposalDetail.tsx`**: Share password + expiration UI
-- **`src/pages/ProposalBuilder.tsx`**: Share expiration option
-- **Auth config**: Enable leaked password protection
+- **Frontend**: Replace `/dashboard` with a chat workspace. Sidebar for thread history, main area for streaming messages, composer at bottom.
+- **Backend**: New Supabase Edge Function `chat` using `streamText` via Lovable AI Gateway (`openai/gpt-5.6-sol` on the Responses API).
+- **Persistence**: Store chat threads and messages in new tables (`threads`, `chat_messages`) with RLS.
+- **System prompt**: A base persona tuned for document/code/image/helpful assistant work.
+- **Deliverable**: A working chat that streams responses and remembers the current conversation.
 
+## Phase 2: Personal Memory
+
+Make the AI remember things across conversations.
+
+- **Preferences table**: User-level facts (writing style, preferred output format, role, tech stack, favorite tools).
+- **Memory extraction**: After each turn, ask a small model to extract facts/preferences from the conversation and upsert them.
+- **Context injection**: On every chat request, prepend relevant memories and a short user profile to the system prompt.
+- **Deliverable**: The AI starts knowing your defaults (e.g., "write Python, not JS", "formal tone", "output PDF").
+
+## Phase 3: RAG and File Uploads
+
+Let the AI learn from your documents, not just chats.
+
+- **Files table**: Upload and store PDFs, images, code files, notes.
+- **Embeddings**: Use `text-embedding-3-small` or `google/gemini-embedding-2` to vectorize text and documents.
+- **Vector search**: Retrieve relevant chunks before answering.
+- **Image understanding**: Send images in chat messages for analysis.
+- **Deliverable**: Ask questions about uploaded files, generate content based on them, and have the AI remember project context.
+
+## Phase 4: Tools and Outputs
+
+Give the AI abilities beyond text.
+
+- **PDF generation**: Tool that turns a markdown/conversation output into a PDF (e.g., via `pdf-lib`, `react-pdf`, or a server-side renderer).
+- **Code generation**: Tool that returns code blocks, and a UI that can copy/download/insert them into a file editor.
+- **Image generation**: Tool that calls an image model (Lovable AI Gateway) when asked.
+- **Web search**: Tool that fetches recent pages or uses a search connector (if available).
+- **Deliverable**: The assistant can produce documents, code, images, and search the web.
+
+## Phase 5: Feedback Loop and Skills
+
+Close the loop so the AI improves from your corrections.
+
+- **Feedback capture**: Thumbs up/down + edit mode on every assistant message.
+- **Feedback storage**: Store original output, user edit, and reason in a `feedback` table.
+- **Example injection**: Periodically include top-rated past outputs as few-shot examples in the system prompt.
+- **Skills**: A `skills` table of reusable prompt/tool combos (e.g., "Proposal writer", "Code reviewer", "Image brief maker") that the user can create, edit, and invoke.
+- **Deliverable**: The AI visibly gets better at your recurring tasks and can adopt new "skills" you define.
+
+## Phase 6: MCPs and Connectors
+
+Connect to external tools and services.
+
+- **MCP client**: Add an MCP client layer to connect to external MCP servers.
+- **Connector storage**: Store MCP URLs/credentials securely.
+- **Tool fanout**: Let the assistant discover and call tools from connected MCPs.
+- **Deliverable**: The AI can use your external tools (GitHub, databases, APIs, etc.).
+
+## Recommended First Step
+
+Start with **Phase 1 only**. Do not build the whole thing at once. A single working chat workspace with history is the foundation everything else depends on. Once it streams and persists, we layer memory, files, tools, and feedback on top.
+
+## Files to Create / Modify
+
+- New Edge Function: `supabase/functions/chat/index.ts`
+- New tables: `threads`, `chat_messages`, `memories`, `files`, `feedback`, `skills`
+- New pages: `src/pages/ChatWorkspace.tsx`, `src/pages/ThreadSidebar.tsx` (component)
+- Modify: `src/App.tsx` routes, `src/index.css` for chat styling
+- Remove/replace: proposal-focused dashboard routes (later, not in Phase 1)
+
+## Tech Stack
+
+- Lovable AI Gateway via Supabase Edge Functions
+- AI SDK (`streamText`, tools, `Output`)
+- Supabase Storage for files
+- Vector storage via `pgvector` in Supabase
+- React + shadcn/ui for chat UI
+
+## Cost and Limits
+
+- Lovable AI Gateway has a free monthly allowance; heavy use will need credits.
+- Embeddings and file storage also consume usage.
+- We can add a credit-aware pause later (Phase 5).
