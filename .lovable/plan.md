@@ -62,17 +62,31 @@ Give the AI abilities beyond text.
 - **Web search**: Tool that fetches recent pages or uses a search connector (if available).
 - **Deliverable**: The assistant can produce documents, code, images, and search the web.
 
-## Phase 5: Feedback Loop and Skills
+## Phase 5: Site Maker
+
+A Lovable-style tool where you describe a site and the AI builds it, previewed live inside your workspace.
+
+- **Generation**: A `generate-site` tool that produces a self-contained site as structured files (HTML + Tailwind CSS + JS, or a multi-file React bundle) from your prompt.
+- **Live preview**: Render the generated site in a sandboxed iframe next to the chat, with desktop/mobile toggles.
+- **Iterative editing**: Chat follow-ups ("make the hero darker", "add a pricing section") patch the existing files rather than regenerating from scratch. Every version is saved so you can roll back.
+- **Storage**: A `sites` table plus a `site_files` table (path + content + version), with RLS scoped to you.
+- **Assets**: Generated or uploaded images are stored in Supabase Storage and referenced by the site.
+- **Export & publish**: Download the site as a ZIP, and optionally serve it at a public `/s/:slug` route so you can share it.
+- **Style memory**: The site maker reads your stored preferences (fonts, palettes, tone, layout habits) so new sites default to your taste, and learns from the edits you make.
+- **Deliverable**: Describe a site in chat, watch it appear, refine it conversationally, then export or share it.
+
+## Phase 6: Feedback Loop and Skills
 
 Close the loop so the AI improves from your corrections.
 
 - **Feedback capture**: Thumbs up/down + edit mode on every assistant message.
 - **Feedback storage**: Store original output, user edit, and reason in a `feedback` table.
 - **Example injection**: Periodically include top-rated past outputs as few-shot examples in the system prompt.
-- **Skills**: A `skills` table of reusable prompt/tool combos (e.g., "Proposal writer", "Code reviewer", "Image brief maker") that the user can create, edit, and invoke.
+- **Skills**: A `skills` table of reusable prompt/tool combos (e.g., "Proposal writer", "Code reviewer", "Landing page builder") that the user can create, edit, and invoke.
 - **Deliverable**: The AI visibly gets better at your recurring tasks and can adopt new "skills" you define.
 
-## Phase 6: MCPs and Connectors
+## Phase 7: MCPs and Connectors
+
 
 Connect to external tools and services.
 
