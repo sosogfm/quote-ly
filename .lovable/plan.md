@@ -102,10 +102,11 @@ Start with **Phase 1 only**. Do not build the whole thing at once. A single work
 ## Files to Create / Modify
 
 - New Edge Function: `supabase/functions/chat/index.ts`
-- New tables: `threads`, `chat_messages`, `memories`, `files`, `feedback`, `skills`
-- New pages: `src/pages/ChatWorkspace.tsx`, `src/pages/ThreadSidebar.tsx` (component)
+- New tables: `threads`, `chat_messages`, `memories`, `files`, `feedback`, `skills`, `sites`, `site_files`
+- New pages: `src/pages/ChatWorkspace.tsx`, `src/pages/SiteMaker.tsx`, `src/components/ThreadSidebar.tsx`, `src/components/SitePreview.tsx`
 - Modify: `src/App.tsx` routes, `src/index.css` for chat styling
 - Remove/replace: proposal-focused dashboard routes (later, not in Phase 1)
+
 
 ## Tech Stack
 
