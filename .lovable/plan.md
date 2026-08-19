@@ -23,15 +23,39 @@ No public LLM updates its own weights in real time. Instead, we build a **person
 +-------------+     +----------------+
 ```
 
-## Phase 1: Chat Foundation
+## Phase 1: Workspace Shell and Chat Foundation
 
-Build a clean, Claude-like chat interface that replaces the current proposal app.
+Build a clean, Claude-like workspace that replaces the current proposal app.
 
-- **Frontend**: Replace `/dashboard` with a chat workspace. Sidebar for thread history, main area for streaming messages, composer at bottom.
+Layout:
+
+```text
++----------------+--------------------------------+-------------------+
+| Sidebar        | Main pane                      | Artifact panel    |
+|                |                                |                   |
+| + New chat     |  streaming conversation        |  live preview of  |
+| Search         |  markdown + code blocks        |  PDF / site /     |
+|                |                                |  image / code     |
+| PROJECTS       |  composer with attachments     |                   |
+|  - Client work |                                |  version history  |
+|  - Personal    |                                |  download / open  |
+|                |                                |                   |
+| RECENT CHATS   |                                |                   |
+| ARTIFACTS      |                                |                   |
+| Settings       |                                |                   |
++----------------+--------------------------------+-------------------+
+```
+
+- **Sidebar**: New chat button, full-text search across conversations, collapsible Projects list, recent chats, and an Artifacts entry. Collapses to icons on narrow screens and becomes a drawer on mobile.
+- **Projects**: A project groups related chats, files, and artifacts, and can carry its own instructions and context that get injected into every chat inside it.
+- **Artifacts panel**: A right-hand pane that opens whenever the AI produces something previewable — a document, a site, an image, or code. Shows a live preview, version history, and download/open actions.
+- **Artifacts library**: A dedicated gallery page listing every artifact you have ever generated, filterable by type and project, with search.
 - **Backend**: New Supabase Edge Function `chat` using `streamText` via Lovable AI Gateway (`openai/gpt-5.6-sol` on the Responses API).
-- **Persistence**: Store chat threads and messages in new tables (`threads`, `chat_messages`) with RLS.
-- **System prompt**: A base persona tuned for document/code/image/helpful assistant work.
-- **Deliverable**: A working chat that streams responses and remembers the current conversation.
+- **Persistence**: New tables `projects`, `threads`, `chat_messages`, `artifacts` with RLS scoped to you.
+- **Chat UI**: Built from AI Elements primitives (conversation, message, prompt-input, tool, shimmer) rather than hand-rolled bubbles.
+- **System prompt**: A base persona tuned for document/code/site/image assistant work.
+- **Deliverable**: A working workspace where you can chat, browse past conversations by project, and see every artifact the AI has made.
+
 
 ## Phase 2: Personal Memory
 
@@ -102,10 +126,12 @@ Start with **Phase 1 only**. Do not build the whole thing at once. A single work
 ## Files to Create / Modify
 
 - New Edge Function: `supabase/functions/chat/index.ts`
-- New tables: `threads`, `chat_messages`, `memories`, `files`, `feedback`, `skills`, `sites`, `site_files`
-- New pages: `src/pages/ChatWorkspace.tsx`, `src/pages/SiteMaker.tsx`, `src/components/ThreadSidebar.tsx`, `src/components/SitePreview.tsx`
-- Modify: `src/App.tsx` routes, `src/index.css` for chat styling
+- New tables: `projects`, `threads`, `chat_messages`, `artifacts`, `memories`, `files`, `feedback`, `skills`, `sites`, `site_files`
+- New pages: `src/pages/Workspace.tsx` (chat), `src/pages/Projects.tsx`, `src/pages/Artifacts.tsx`, `src/pages/SiteMaker.tsx`
+- New components: `WorkspaceSidebar`, `ThreadList`, `ArtifactPanel`, `ArtifactCard`, `SitePreview`
+- Modify: `src/App.tsx` routes, `src/index.css` for the workspace design tokens
 - Remove/replace: proposal-focused dashboard routes (later, not in Phase 1)
+
 
 
 ## Tech Stack
