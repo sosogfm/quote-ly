@@ -20,6 +20,7 @@ import ProposalDetail from "./pages/ProposalDetail";
 import ClientDetail from "./pages/ClientDetail";
 import Settings from "./pages/Settings";
 import PublicProposal from "./pages/PublicProposal";
+import Workspace from "./pages/Workspace";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
