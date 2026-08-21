@@ -120,7 +120,7 @@ Deno.serve(async (req) => {
     const result = streamText({
       model: lovable.responses("openai/gpt-5.6-sol"),
       system,
-      messages: convertToModelMessages(messages),
+      messages: await convertToModelMessages(messages),
       abortSignal: req.signal,
       providerOptions: {
         openai: {
