@@ -34,7 +34,10 @@ const App = () => (
         <AuthProvider>
           <Routes>
             <Route path="/" element={<Landing />} />
+            <Route path="/workspace" element={<ProtectedRoute><Workspace /></ProtectedRoute>} />
+            <Route path="/workspace/:threadId" element={<ProtectedRoute><Workspace /></ProtectedRoute>} />
             <Route path="/login" element={<Login />} />
+
             <Route path="/signup" element={<Signup />} />
             <Route path="/forgot-password" element={<ForgotPassword />} />
             <Route path="/reset-password" element={<ResetPassword />} />
