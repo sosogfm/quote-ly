@@ -234,6 +234,180 @@ export type Database = {
           },
         ]
       }
+      dev_task_events: {
+        Row: {
+          action: string
+          created_at: string
+          detail: Json | null
+          from_state: Database["public"]["Enums"]["dev_task_state"] | null
+          id: string
+          simulated: boolean
+          task_id: string
+          to_state: Database["public"]["Enums"]["dev_task_state"] | null
+          user_id: string
+        }
+        Insert: {
+          action: string
+          created_at?: string
+          detail?: Json | null
+          from_state?: Database["public"]["Enums"]["dev_task_state"] | null
+          id?: string
+          simulated?: boolean
+          task_id: string
+          to_state?: Database["public"]["Enums"]["dev_task_state"] | null
+          user_id: string
+        }
+        Update: {
+          action?: string
+          created_at?: string
+          detail?: Json | null
+          from_state?: Database["public"]["Enums"]["dev_task_state"] | null
+          id?: string
+          simulated?: boolean
+          task_id?: string
+          to_state?: Database["public"]["Enums"]["dev_task_state"] | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "dev_task_events_task_id_fkey"
+            columns: ["task_id"]
+            isOneToOne: false
+            referencedRelation: "dev_tasks"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      dev_task_files: {
+        Row: {
+          change_type: string
+          created_at: string
+          id: string
+          language: string | null
+          new_content: string | null
+          old_content: string | null
+          path: string
+          reason: string | null
+          reverted: boolean
+          task_id: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          change_type?: string
+          created_at?: string
+          id?: string
+          language?: string | null
+          new_content?: string | null
+          old_content?: string | null
+          path: string
+          reason?: string | null
+          reverted?: boolean
+          task_id: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          change_type?: string
+          created_at?: string
+          id?: string
+          language?: string | null
+          new_content?: string | null
+          old_content?: string | null
+          path?: string
+          reason?: string | null
+          reverted?: boolean
+          task_id?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "dev_task_files_task_id_fkey"
+            columns: ["task_id"]
+            isOneToOne: false
+            referencedRelation: "dev_tasks"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      dev_tasks: {
+        Row: {
+          base_branch: string | null
+          change_mode: Database["public"]["Enums"]["dev_change_mode"]
+          created_at: string
+          deployment: Json | null
+          environment: string
+          id: string
+          plan: Json
+          plan_approved_at: string | null
+          plan_approved_by: string | null
+          preview: Json | null
+          repository: string | null
+          request: string
+          simulated: boolean
+          state: Database["public"]["Enums"]["dev_task_state"]
+          test_results: Json | null
+          thread_id: string | null
+          title: string
+          updated_at: string
+          user_id: string
+          work_branch: string | null
+        }
+        Insert: {
+          base_branch?: string | null
+          change_mode?: Database["public"]["Enums"]["dev_change_mode"]
+          created_at?: string
+          deployment?: Json | null
+          environment?: string
+          id?: string
+          plan?: Json
+          plan_approved_at?: string | null
+          plan_approved_by?: string | null
+          preview?: Json | null
+          repository?: string | null
+          request: string
+          simulated?: boolean
+          state?: Database["public"]["Enums"]["dev_task_state"]
+          test_results?: Json | null
+          thread_id?: string | null
+          title: string
+          updated_at?: string
+          user_id: string
+          work_branch?: string | null
+        }
+        Update: {
+          base_branch?: string | null
+          change_mode?: Database["public"]["Enums"]["dev_change_mode"]
+          created_at?: string
+          deployment?: Json | null
+          environment?: string
+          id?: string
+          plan?: Json
+          plan_approved_at?: string | null
+          plan_approved_by?: string | null
+          preview?: Json | null
+          repository?: string | null
+          request?: string
+          simulated?: boolean
+          state?: Database["public"]["Enums"]["dev_task_state"]
+          test_results?: Json | null
+          thread_id?: string | null
+          title?: string
+          updated_at?: string
+          user_id?: string
+          work_branch?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "dev_tasks_thread_id_fkey"
+            columns: ["thread_id"]
+            isOneToOne: false
+            referencedRelation: "threads"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       line_items: {
         Row: {
           amount: number | null
@@ -669,6 +843,77 @@ export type Database = {
           },
         ]
       }
+      user_memories: {
+        Row: {
+          active: boolean
+          content: string
+          created_at: string
+          id: string
+          importance: number
+          kind: Database["public"]["Enums"]["memory_kind"]
+          source_thread_id: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          active?: boolean
+          content: string
+          created_at?: string
+          id?: string
+          importance?: number
+          kind?: Database["public"]["Enums"]["memory_kind"]
+          source_thread_id?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          active?: boolean
+          content?: string
+          created_at?: string
+          id?: string
+          importance?: number
+          kind?: Database["public"]["Enums"]["memory_kind"]
+          source_thread_id?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "user_memories_source_thread_id_fkey"
+            columns: ["source_thread_id"]
+            isOneToOne: false
+            referencedRelation: "threads"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      user_profile_summary: {
+        Row: {
+          created_at: string
+          message_count: number
+          summary: string
+          updated_at: string
+          user_id: string
+          writing_style: string | null
+        }
+        Insert: {
+          created_at?: string
+          message_count?: number
+          summary?: string
+          updated_at?: string
+          user_id: string
+          writing_style?: string | null
+        }
+        Update: {
+          created_at?: string
+          message_count?: number
+          summary?: string
+          updated_at?: string
+          user_id?: string
+          writing_style?: string | null
+        }
+        Relationships: []
+      }
       user_roles: {
         Row: {
           id: string
@@ -708,6 +953,25 @@ export type Database = {
     }
     Enums: {
       app_role: "admin" | "manager" | "agent"
+      dev_change_mode: "conservative" | "balanced" | "refactor"
+      dev_task_state:
+        | "analyzing"
+        | "awaiting_approval"
+        | "creating_branch"
+        | "editing_code"
+        | "running_tests"
+        | "fixing_errors"
+        | "generating_preview"
+        | "awaiting_review"
+        | "approved"
+        | "rejected"
+        | "opening_pr"
+        | "deploying"
+        | "deployed"
+        | "deploy_failed"
+        | "rolled_back"
+        | "cancelled"
+      memory_kind: "preference" | "style" | "fact" | "correction" | "skill"
       proposal_status: "draft" | "sent" | "viewed" | "accepted" | "rejected"
       template_category:
         | "web_design"
@@ -843,6 +1107,26 @@ export const Constants = {
   public: {
     Enums: {
       app_role: ["admin", "manager", "agent"],
+      dev_change_mode: ["conservative", "balanced", "refactor"],
+      dev_task_state: [
+        "analyzing",
+        "awaiting_approval",
+        "creating_branch",
+        "editing_code",
+        "running_tests",
+        "fixing_errors",
+        "generating_preview",
+        "awaiting_review",
+        "approved",
+        "rejected",
+        "opening_pr",
+        "deploying",
+        "deployed",
+        "deploy_failed",
+        "rolled_back",
+        "cancelled",
+      ],
+      memory_kind: ["preference", "style", "fact", "correction", "skill"],
       proposal_status: ["draft", "sent", "viewed", "accepted", "rejected"],
       template_category: [
         "web_design",
