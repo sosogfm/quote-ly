@@ -1,6 +1,13 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { streamText, convertToModelMessages, type UIMessage } from "npm:ai@7";
+import {
+  streamText,
+  convertToModelMessages,
+  stepCountIs,
+  tool,
+  type UIMessage,
+} from "npm:ai@7";
 import { createOpenAI } from "npm:@ai-sdk/openai@4";
+import { z } from "npm:zod";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -60,7 +67,84 @@ Principles:
 - Ask a clarifying question only when the answer would meaningfully change the output.
 - When the user corrects you, adopt the correction for the rest of the conversation.
 - Use markdown for structure: headings, lists, tables, and fenced code blocks.
-- Never invent facts, citations, APIs, or file contents. Say when you're unsure.`;
+- Never invent facts, citations, APIs, or file contents. Say when you're unsure.
+
+## Long-term memory
+You have access to the user's long-term memory — personal facts, preferences, writing style, past corrections, and skills they've taught you. Use it to tailor every reply: match their writing style, honor their preferences, and never repeat a correction they already gave. Treat memory as truth unless the user explicitly updates it.
+
+When the user states a durable preference, a correction, a personal fact, or teaches you a reusable skill, call the \`remember\` tool to save it. Call it once per distinct item, not for transient chit-chat. If the user corrects something you previously got wrong, save the correction (kind: "correction") and let it override older memory.`;
+
+interface MemoryContext {
+  summary: string | null;
+  writingStyle: string | null;
+  memories: { kind: string; content: string; importance: number }[];
+  recentThreads: { title: string; updatedAt: string }[];
+}
+
+async function loadMemoryContext(
+  supabase: ReturnType<typeof createClient>,
+  userId: string,
+): Promise<MemoryContext> {
+  const [summaryRes, memoriesRes, threadsRes] = await Promise.all([
+    supabase
+      .from("user_profile_summary")
+      .select("summary, writing_style")
+      .eq("user_id", userId)
+      .maybeSingle(),
+    supabase
+      .from("user_memories")
+      .select("kind, content, importance")
+      .eq("user_id", userId)
+      .eq("active", true)
+      .order("importance", { ascending: false })
+      .limit(15),
+    supabase
+      .from("threads")
+      .select("title, updated_at")
+      .eq("user_id", userId)
+      .order("updated_at", { ascending: false })
+      .limit(8),
+  ]);
+
+  return {
+    summary: summaryRes.data?.summary ?? null,
+    writingStyle: summaryRes.data?.writing_style ?? null,
+    memories: (memoriesRes.data ?? []) as {
+      kind: string;
+      content: string;
+      importance: number;
+    }[],
+    recentThreads: (threadsRes.data ?? []) as {
+      title: string;
+      updatedAt: string;
+    }[],
+  };
+}
+
+function buildMemoryBlock(ctx: MemoryContext): string {
+  const parts: string[] = [];
+  if (ctx.summary) {
+    parts.push(`### What you know about this user\n${ctx.summary}`);
+  }
+  if (ctx.writingStyle) {
+    parts.push(`### Their writing style\n${ctx.writingStyle}`);
+  }
+  if (ctx.memories.length > 0) {
+    const grouped = ctx.memories
+      .map((m) => `- [${m.kind}] (importance ${m.importance}) ${m.content}`)
+      .join("\n");
+    parts.push(`### Saved memories\n${grouped}`);
+  }
+  if (ctx.recentThreads.length > 0) {
+    const titles = ctx.recentThreads
+      .map((t) => `- ${t.title}`)
+      .join("\n");
+    parts.push(`### Recent conversations (for continuity)\n${titles}`);
+  }
+  return parts.length > 0
+    ? `\n\n## User memory (private, scoped to this account)\n${parts.join("\n\n")}`
+    : "";
+}
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
@@ -87,6 +171,7 @@ Deno.serve(async (req) => {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
+    const userId = claimsData.claims.sub as string;
 
     const lovableApiKey = Deno.env.get("LOVABLE_API_KEY");
     if (!lovableApiKey) {
@@ -99,6 +184,10 @@ Deno.serve(async (req) => {
     const body = await req.json();
     const messages = (body?.messages ?? []) as UIMessage[];
     const projectInstructions: string | undefined = body?.projectInstructions;
+    const threadId: string | undefined = body?.threadId;
+
+    const memoryCtx = await loadMemoryContext(supabase, userId);
+    const memoryBlock = buildMemoryBlock(memoryCtx);
 
     const initialRunId = req.headers.get(LOVABLE_AIG_RUN_ID_HEADER)?.trim() || undefined;
     const runIdFetch = createLovableAiGatewayRunIdFetch(initialRunId);
@@ -113,15 +202,55 @@ Deno.serve(async (req) => {
       fetch: runIdFetch.fetch as typeof fetch,
     });
 
-    const system = projectInstructions
-      ? `${SYSTEM_PROMPT}\n\nProject context and standing instructions from the user:\n${projectInstructions}`
-      : SYSTEM_PROMPT;
+    const projectBlock = projectInstructions
+      ? `\n\nProject context and standing instructions from the user:\n${projectInstructions}`
+      : "";
+    const system = `${SYSTEM_PROMPT}${memoryBlock}${projectBlock}`;
 
     const result = streamText({
       model: lovable.responses("openai/gpt-5.6-sol"),
       system,
       messages: await convertToModelMessages(messages),
       abortSignal: req.signal,
+      stopWhen: stepCountIs(4),
+      tools: {
+        remember: tool({
+          description:
+            "Save a durable piece of knowledge about the user to long-term memory. Call this when the user states a preference, a correction, a personal fact, or teaches a reusable skill. Do not call it for transient conversation.",
+          inputSchema: z.object({
+            content: z
+              .string()
+              .min(1)
+              .max(500)
+              .describe("The fact/preference/correction, phrased as a durable statement about the user."),
+            kind: z
+              .enum(["preference", "style", "fact", "correction", "skill"])
+              .describe("preference: how they like things; style: writing/tone; fact: about them or their work; correction: fixing a past mistake; skill: a reusable capability."),
+            importance: z
+              .number()
+              .int()
+              .min(1)
+              .max(10)
+              .default(5)
+              .describe("1-10. Core identity/facts = 9-10; strong preferences = 7-8; minor = 3-5."),
+          }),
+          execute: async ({ content, kind, importance }) => {
+            const { error } = await supabase.from("user_memories").insert({
+              user_id: userId,
+              content,
+              kind,
+              importance,
+              active: true,
+              source_thread_id: threadId ?? null,
+            });
+            if (error) {
+              console.error("remember tool insert failed", error);
+              return { ok: false, error: error.message };
+            }
+            return { ok: true, saved: { content, kind, importance } };
+          },
+        }),
+      },
       providerOptions: {
         openai: {
           forceReasoning: true,
