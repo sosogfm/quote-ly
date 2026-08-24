@@ -10,7 +10,8 @@ import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
-import { Building2, User, Users, Layers } from "lucide-react";
+import { Building2, User, Users, Layers, Brain } from "lucide-react";
+import { MemorySettings } from "@/components/settings/MemorySettings";
 
 export default function Settings() {
   const { user, role, organization, refreshOrg } = useAuth();
