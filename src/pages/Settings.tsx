@@ -251,6 +251,10 @@ export default function Settings() {
               </Card>
             </TabsContent>
           )}
+
+          <TabsContent value="memory" className="mt-6">
+            <MemorySettings />
+          </TabsContent>
         </Tabs>
       </div>
     </DashboardLayout>
