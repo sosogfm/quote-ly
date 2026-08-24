@@ -10,7 +10,8 @@ import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
-import { Building2, User, Users, Layers } from "lucide-react";
+import { Building2, User, Users, Layers, Brain } from "lucide-react";
+import { MemorySettings } from "@/components/settings/MemorySettings";
 
 export default function Settings() {
   const { user, role, organization, refreshOrg } = useAuth();
@@ -112,6 +113,7 @@ export default function Settings() {
             {isAdmin && <TabsTrigger value="organization" className="gap-2"><Building2 className="h-4 w-4" /> Organization</TabsTrigger>}
             {isAdmin && <TabsTrigger value="team" className="gap-2"><Users className="h-4 w-4" /> Team</TabsTrigger>}
             {isAdmin && <TabsTrigger value="departments" className="gap-2"><Layers className="h-4 w-4" /> Departments</TabsTrigger>}
+            <TabsTrigger value="memory" className="gap-2"><Brain className="h-4 w-4" /> Memory</TabsTrigger>
           </TabsList>
 
           <TabsContent value="profile" className="mt-6">
@@ -249,6 +251,10 @@ export default function Settings() {
               </Card>
             </TabsContent>
           )}
+
+          <TabsContent value="memory" className="mt-6">
+            <MemorySettings />
+          </TabsContent>
         </Tabs>
       </div>
     </DashboardLayout>

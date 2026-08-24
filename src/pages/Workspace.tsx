@@ -59,6 +59,7 @@ export default function Workspace() {
   const { messages, setMessages, sendMessage, status, stop, error } = useChat({
     transport: new DefaultChatTransport({
       api: CHAT_URL,
+      body: () => ({ threadId: threadIdRef.current }),
       headers: () => ({
         Authorization: `Bearer ${session?.access_token ?? ""}`,
         "Content-Type": "application/json",
