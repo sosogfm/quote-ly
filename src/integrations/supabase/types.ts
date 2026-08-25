@@ -280,12 +280,14 @@ export type Database = {
       }
       dev_task_files: {
         Row: {
+          applied: boolean
           change_type: string
           created_at: string
           id: string
           language: string | null
           new_content: string | null
           old_content: string | null
+          patch: string | null
           path: string
           reason: string | null
           reverted: boolean
@@ -294,12 +296,14 @@ export type Database = {
           user_id: string
         }
         Insert: {
+          applied?: boolean
           change_type?: string
           created_at?: string
           id?: string
           language?: string | null
           new_content?: string | null
           old_content?: string | null
+          patch?: string | null
           path: string
           reason?: string | null
           reverted?: boolean
@@ -308,12 +312,14 @@ export type Database = {
           user_id: string
         }
         Update: {
+          applied?: boolean
           change_type?: string
           created_at?: string
           id?: string
           language?: string | null
           new_content?: string | null
           old_content?: string | null
+          patch?: string | null
           path?: string
           reason?: string | null
           reverted?: boolean
@@ -333,19 +339,33 @@ export type Database = {
       }
       dev_tasks: {
         Row: {
+          applied_at: string | null
+          applied_by: string | null
           base_branch: string | null
           change_mode: Database["public"]["Enums"]["dev_change_mode"]
           created_at: string
           deployment: Json | null
           environment: string
+          estimated_cost: string | null
+          evidence: Json
           id: string
+          impact: string | null
+          migration_confirmed_at: string | null
           plan: Json
           plan_approved_at: string | null
           plan_approved_by: string | null
           preview: Json | null
+          problem: string | null
           repository: string | null
           request: string
+          required_tests: Json
+          requires_migration: boolean
+          risk_level: Database["public"]["Enums"]["evolution_risk_level"] | null
+          risks: Json
+          rollback_plan: string | null
           simulated: boolean
+          solution: string | null
+          source: string
           state: Database["public"]["Enums"]["dev_task_state"]
           test_results: Json | null
           thread_id: string | null
@@ -355,19 +375,35 @@ export type Database = {
           work_branch: string | null
         }
         Insert: {
+          applied_at?: string | null
+          applied_by?: string | null
           base_branch?: string | null
           change_mode?: Database["public"]["Enums"]["dev_change_mode"]
           created_at?: string
           deployment?: Json | null
           environment?: string
+          estimated_cost?: string | null
+          evidence?: Json
           id?: string
+          impact?: string | null
+          migration_confirmed_at?: string | null
           plan?: Json
           plan_approved_at?: string | null
           plan_approved_by?: string | null
           preview?: Json | null
+          problem?: string | null
           repository?: string | null
           request: string
+          required_tests?: Json
+          requires_migration?: boolean
+          risk_level?:
+            | Database["public"]["Enums"]["evolution_risk_level"]
+            | null
+          risks?: Json
+          rollback_plan?: string | null
           simulated?: boolean
+          solution?: string | null
+          source?: string
           state?: Database["public"]["Enums"]["dev_task_state"]
           test_results?: Json | null
           thread_id?: string | null
@@ -377,19 +413,35 @@ export type Database = {
           work_branch?: string | null
         }
         Update: {
+          applied_at?: string | null
+          applied_by?: string | null
           base_branch?: string | null
           change_mode?: Database["public"]["Enums"]["dev_change_mode"]
           created_at?: string
           deployment?: Json | null
           environment?: string
+          estimated_cost?: string | null
+          evidence?: Json
           id?: string
+          impact?: string | null
+          migration_confirmed_at?: string | null
           plan?: Json
           plan_approved_at?: string | null
           plan_approved_by?: string | null
           preview?: Json | null
+          problem?: string | null
           repository?: string | null
           request?: string
+          required_tests?: Json
+          requires_migration?: boolean
+          risk_level?:
+            | Database["public"]["Enums"]["evolution_risk_level"]
+            | null
+          risks?: Json
+          rollback_plan?: string | null
           simulated?: boolean
+          solution?: string | null
+          source?: string
           state?: Database["public"]["Enums"]["dev_task_state"]
           test_results?: Json | null
           thread_id?: string | null
@@ -404,6 +456,107 @@ export type Database = {
             columns: ["thread_id"]
             isOneToOne: false
             referencedRelation: "threads"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      evolution_error_reports: {
+        Row: {
+          created_at: string
+          detail: Json
+          id: string
+          message: string
+          route: string | null
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          detail?: Json
+          id?: string
+          message: string
+          route?: string | null
+          user_id?: string
+        }
+        Update: {
+          created_at?: string
+          detail?: Json
+          id?: string
+          message?: string
+          route?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
+      evolution_feedback: {
+        Row: {
+          context: Json
+          created_at: string
+          id: string
+          message: string
+          page: string | null
+          user_id: string
+        }
+        Insert: {
+          context?: Json
+          created_at?: string
+          id?: string
+          message: string
+          page?: string | null
+          user_id?: string
+        }
+        Update: {
+          context?: Json
+          created_at?: string
+          id?: string
+          message?: string
+          page?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
+      evolution_test_runs: {
+        Row: {
+          created_at: string
+          executed_at: string | null
+          executed_by: string | null
+          id: string
+          name: string
+          output: string | null
+          required: boolean
+          result: Database["public"]["Enums"]["evolution_test_result"]
+          task_id: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          executed_at?: string | null
+          executed_by?: string | null
+          id?: string
+          name: string
+          output?: string | null
+          required?: boolean
+          result?: Database["public"]["Enums"]["evolution_test_result"]
+          task_id: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          executed_at?: string | null
+          executed_by?: string | null
+          id?: string
+          name?: string
+          output?: string | null
+          required?: boolean
+          result?: Database["public"]["Enums"]["evolution_test_result"]
+          task_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "evolution_test_runs_task_id_fkey"
+            columns: ["task_id"]
+            isOneToOne: false
+            referencedRelation: "dev_tasks"
             referencedColumns: ["id"]
           },
         ]
@@ -971,6 +1124,9 @@ export type Database = {
         | "deploy_failed"
         | "rolled_back"
         | "cancelled"
+        | "needs_revision"
+      evolution_risk_level: "low" | "medium" | "high" | "critical"
+      evolution_test_result: "pending" | "passed" | "failed"
       memory_kind: "preference" | "style" | "fact" | "correction" | "skill"
       proposal_status: "draft" | "sent" | "viewed" | "accepted" | "rejected"
       template_category:
@@ -1125,7 +1281,10 @@ export const Constants = {
         "deploy_failed",
         "rolled_back",
         "cancelled",
+        "needs_revision",
       ],
+      evolution_risk_level: ["low", "medium", "high", "critical"],
+      evolution_test_result: ["pending", "passed", "failed"],
       memory_kind: ["preference", "style", "fact", "correction", "skill"],
       proposal_status: ["draft", "sent", "viewed", "accepted", "rejected"],
       template_category: [
