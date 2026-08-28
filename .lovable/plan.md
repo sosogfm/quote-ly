@@ -1,79 +1,51 @@
-# Central de Evolução — Etapa 1 (MVP seguro)
+# BYOK: IA própria com Gemini grátis (Google AI Studio)
 
-## 1. Diagnóstico da arquitetura atual
+## Objetivo
+Parar de depender dos créditos do Lovable AI Gateway para as funções de IA do app. A IA passa a usar a **sua própria chave gratuita do Google AI Studio** (Gemini API), com fallback automático para o gateway da Lovable se a chave não estiver configurada.
 
-- **Stack**: React 18 + Vite + TypeScript + Tailwind + shadcn/ui. Backend = Lovable Cloud (Postgres + Auth + Edge Functions em Deno).
-- **Autenticação/autorização**: `AuthProvider` (`src/contexts/AuthContext.tsx`) expõe `user`, `role`, `organization`; `ProtectedRoute` protege rotas. Papéis ficam na tabela separada `user_roles` (`admin`/`manager`/`agent`) e são verificados no banco pela função segura `has_role(uuid, app_role)`. Já existe trigger que concede admin ao seu e-mail.
-- **IA**: função de borda `chat` já usa o Lovable AI Gateway (AI SDK v7, streaming, ferramentas, memória por conta). A chave da IA vive só no backend — nenhum segredo no navegador.
-- **Auditoria**: tabela `audit_logs` já existe (insert/update/delete bloqueados por RLS, gravada por triggers `security definer`).
-- **Já no banco, mas sem interface**: `dev_tasks`, `dev_task_events`, `dev_task_files` — criadas numa entrega anterior do "Modo Desenvolvimento" e nunca usadas. Serão **reaproveitadas** como base, não duplicadas.
-- **Layouts reutilizáveis**: `DashboardLayout` (área administrativa) e `Workspace` (chat). A Central de Evolução entra no `DashboardLayout`.
-- **Sem integração com GitHub/CI hoje** → a Etapa 1 opera obrigatoriamente em **modo patch manual**, deixando explícito na interface que nada foi aplicado.
+## O que você precisa fazer (1 passo, fora do app)
+1. Criar uma chave gratuita em https://aistudio.google.com/apikey (login com conta Google, sem cartão).
+2. Me enviar a chave quando eu pedir via ferramenta de secrets — ela fica salva no servidor, nunca no código nem no navegador.
 
-## 2. Arquivos criados e alterados
+## O que eu vou implementar
 
-Criados:
-- `src/pages/Evolution.tsx` — dashboard + lista de propostas com filtros e busca.
-- `src/pages/EvolutionProposal.tsx` — detalhe da proposta (diff, riscos, testes, rollback, histórico, ações).
-- `src/components/evolution/ProposalCard.tsx`, `RiskBadge.tsx`, `StatusBadge.tsx`, `DiffViewer.tsx`, `ProposalTimeline.tsx`, `NewProposalDialog.tsx`, `ApproveDialog.tsx`.
-- `src/lib/evolution/types.ts` — estados, níveis de risco, esquema de validação (zod) da saída do modelo.
-- `src/lib/evolution/transitions.ts` — máquina de estados e regras de bloqueio (função pura, testável).
-- `src/components/AdminRoute.tsx` — guarda de rota por papel de administrador.
-- `supabase/functions/evolution-propose/index.ts` — gera a proposta estruturada.
-- `supabase/functions/evolution-action/index.ts` — aprovar/rejeitar/pedir revisão/registrar teste/marcar aplicado/rollback.
-- Testes em `src/test/evolution/`: máquina de estados, validação da saída do modelo, regras de bloqueio de aplicação, guarda de acesso.
+### 1. Secret e configuração
+- Adicionar o secret `GOOGLE_AI_API_KEY` (ferramenta de secrets, server-side).
+- Nada de chave em código, `.env` público ou localStorage.
 
-Alterados:
-- `src/App.tsx` — rotas `/evolution` e `/evolution/:id` sob `AdminRoute`.
-- `src/components/DashboardLayout.tsx` — item de menu "Central de Evolução" visível só para admin.
-- Nenhuma alteração no fluxo de chat, propostas comerciais, clientes ou templates.
+### 2. Camada de provedor compartilhada
+- Criar `supabase/functions/_shared/ai-provider.ts`:
+  - Se `GOOGLE_AI_API_KEY` existir → chama a **API do Gemini direto** (`generativelanguage.googleapis.com`, modelo `gemini-2.5-flash`, compatível com streaming SSE).
+  - Se não existir → usa o caminho atual (Lovable AI Gateway).
+- Suporte a: chat em streaming (SSE), geração única com saída estruturada (JSON), e tool calling (necessário para a ferramenta `remember` e futuras).
 
-## 3. Plano de implementação (Etapa 1)
+### 3. Migração das funções existentes
+- `chat`: troca a chamada do gateway pelo helper compartilhado, mantendo memória, threads e tool `remember` funcionando.
+- `evolution-propose`: idem, mantendo saída estruturada validada com Zod.
+- Funções de conteúdo/propostas que usam IA: mesma troca.
 
-**Banco (uma migração)** — novas tabelas, todas com RLS restrita a admin:
-- `evolution_proposals`: título, problema, evidências, solução, impacto, riscos, `risk_level`, `status`, plano de rollback, testes exigidos, custo estimado, `requires_migration`, autor, `created_at`.
-- `evolution_patch_files`: proposta, caminho, tipo de mudança, motivo, diff/patch, aplicado (bool).
-- `evolution_test_runs`: proposta, nome do teste, resultado, saída, obrigatório, executado por, quando.
-- `evolution_approvals`: proposta, decisão (aprovado/rejeitado/revisão), justificativa, quem decidiu, quando.
-- `evolution_events`: trilha de auditoria imutável (sem update/delete) de cada transição e ação.
-- `evolution_versions` / `evolution_deployments`: versão anterior registrada, aplicação e rollback.
-- `evolution_feedback` e `evolution_error_reports`: fontes de evidência (feedback do usuário e erros), tratadas como dados não confiáveis.
+### 4. Tratamento de erros claro
+- `429` (limite do nível gratuito: requisições/minuto e/dia): mensagem amigável em português ("limite gratuito atingido, tente em X segundos") com backoff limitado.
+- `401/403`: mensagem indicando chave inválida (sem vazar a chave).
+- Erros de rede/upstream: superfície da mensagem real, sem retry infinito.
 
-Regras de acesso: leitura e escrita apenas para `has_role(auth.uid(),'admin')`; `evolution_feedback` aceita inserção de qualquer usuário autenticado (é o canal de feedback), leitura só admin; `evolution_events` nunca pode ser editada nem apagada. GRANTs explícitos para `authenticated` e `service_role`.
+### 5. Indicador na interface
+- Pequeno selo no workspace: "IA: Gemini (chave própria)" vs "IA: Lovable (créditos)", lendo um endpoint server-side (sem expor a chave).
 
-**Motor de autoaprimoramento** (`evolution-propose`):
-- Valida o JWT e confirma o papel admin no banco antes de qualquer coisa.
-- Monta o contexto: solicitação do admin, feedbacks e erros selecionados, e um inventário de arquivos permitidos (lista controlada — nunca `.env`, `client.ts`, `types.ts`, `previewAuthStorage.ts`, `config.toml`).
-- Chama o Lovable AI Gateway pedindo **saída estruturada** no formato exigido (title, problem, evidence, solution, affectedFiles, patch, riskLevel, risks, tests, rollbackPlan, requiresMigration) e valida com zod. Saída inválida → 400, nada é salvo.
-- Grava a proposta sempre em `draft` → `awaiting_review`. **Nunca** aplica nada.
-- Feedbacks, erros e conteúdo de arquivos entram no prompt dentro de blocos de dados marcados como não confiáveis; instruções embutidas neles são ignoradas por política explícita do prompt.
-- Limite de tamanho de entrada e rate limiting por usuário (contagem de propostas por janela de tempo).
+### 6. Verificação
+- Teste real de ponta a ponta: enviar mensagem no chat e confirmar resposta vindo da API do Google (e não do gateway).
+- Teste do `evolution-propose` com saída estruturada.
+- Checar logs de build e erros de runtime.
 
-**Ações administrativas** (`evolution-action`):
-- Toda transição passa por aqui, com verificação de papel admin no servidor e validação da transição contra a máquina de estados. O frontend só reflete o que o backend permite.
-- O autor da proposta gerada pela IA é o sistema; a aprovação exige um admin autenticado e é registrada com identidade e horário. Uma proposta em `awaiting_review` só avança com decisão explícita.
-- Aplicação (`ready_to_deploy` → `deployed`) é bloqueada se: não houver aprovação registrada, algum teste obrigatório estiver reprovado ou pendente, ou `requires_migration` sem confirmação adicional.
-- Nada de execução de shell, SQL arbitrário ou comandos vindos do cliente: apenas um conjunto fechado de ações nomeadas.
+## Limites do nível gratuito (para alinhar expectativas)
+- O nível gratuito do Gemini tem limites de requisições por minuto/dia. Para uso pessoal moderado costuma bastar; se estourar, o app mostra mensagem clara e você espera o reset ou cria chave em outro projeto Google.
+- Geração de imagens e modelos mais pesados podem não estar no gratuito — quando chegarmos nessas fases (imagens, voz), avaliamos caso a caso.
 
-**Interface**:
-- Dashboard com contadores: pendentes, aprovadas, implantadas, falhas recentes, rollbacks.
-- Lista com filtros de status/risco/data, busca e indicador visual de risco.
-- Detalhe com descrição técnica e não técnica, arquivos afetados, diff colorido, testes, riscos, plano de rollback e histórico.
-- Ações: aprovar, rejeitar com justificativa, pedir revisão, registrar teste, marcar como aplicado, rollback.
-- Diálogo de confirmação antes de aprovar com o texto: "Você está aprovando uma alteração no código do sistema. Revise o diff, os riscos, os testes e o plano de rollback." Risco alto ou crítico exige uma segunda confirmação (digitar a palavra de confirmação).
-- Banner permanente em modo manual: o patch **aguarda aplicação manual**, com instruções de aplicação e botão de copiar o diff. Nenhum estado finge que o código mudou.
+## Fora de escopo (fases futuras)
+- Seletor de modelo na UI, múltiplos provedores, Ollama local.
+- Mudanças nas fases pendentes da Central de Evolução (continuam de onde paramos).
 
-**Testes (vitest)**: usuário comum sem acesso à Central; admin cria e revisa; proposta não aplicável sem aprovação; saída inválida do modelo recusada; risco alto exige segunda confirmação; teste obrigatório reprovado impede aplicação; rollback restaura versão anterior registrada; nenhum segredo aparece em log ou resposta.
-
-## 4. Riscos e dependências
-
-- **Aplicação real de código**: nem o navegador nem uma função de borda podem escrever no repositório. A Etapa 1 entrega o patch para aplicação manual; a aplicação automática depende da Etapa 2 (GitHub App/token + CI), que exigirá que você configure as credenciais — vou te dar as instruções quando chegarmos lá.
-- **Contexto de código para a IA**: sem GitHub, o modelo só vê os arquivos que você colar ou os caminhos que você informar. Em Etapa 1 o campo de contexto é manual; a leitura automática do repositório vem com a integração.
-- **Prompt injection** via feedbacks e logs: mitigado por isolamento em blocos de dados e por a IA nunca ter poder de execução.
-- **Custo de IA**: cada geração de proposta consome créditos; há rate limiting para conter uso acidental.
-- **Escalada de privilégio**: nenhuma ação da Central toca `user_roles`, RLS ou autenticação; propostas que envolvam esses pontos são marcadas como risco crítico e continuam exigindo aprovação humana em duas etapas.
-
-## 5. Etapas seguintes (após aprovação desta)
-
-- **Etapa 2**: integração com GitHub — branch por proposta, commits descritivos, PR vinculado, testes no CI, merge só com aprovação. Requer que você crie um token/GitHub App e o configure como segredo.
-- **Etapa 3**: implantação supervisionada, monitoramento pós-implantação e rollback automatizado sempre iniciado por um administrador.
+## Detalhes técnicos
+- Gemini API expõe modo compatível com OpenAI (`/v1beta/openai/chat/completions`), então o AI SDK (`@ai-sdk/openai-compatible`) já funciona apontando o `baseURL` para o Google com a sua chave — pouca mudança no fluxo de streaming.
+- Streaming obrigatório para chamadas longas (regra da plataforma: chamadas bufferizadas >2 min são cortadas e cobradas).
+- `LOVABLE_API_KEY` permanece como fallback e para recursos que só existem no gateway (ex.: alguns modelos de imagem).
