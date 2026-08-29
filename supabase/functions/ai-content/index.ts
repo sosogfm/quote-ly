@@ -33,8 +33,16 @@ serve(async (req) => {
     }
 
     const { sectionTitle, sectionContent, templateCategory, proposalTitle } = await req.json();
+    const GROQ_API_KEY = Deno.env.get("GROQ_API_KEY");
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
-    if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY is not configured");
+    if (!GROQ_API_KEY && !LOVABLE_API_KEY) throw new Error("No AI provider configured");
+
+    // Prefer the user's own free Groq key (Llama), fall back to Lovable AI.
+    const endpoint = GROQ_API_KEY
+      ? "https://api.groq.com/openai/v1/chat/completions"
+      : "https://ai.gateway.lovable.dev/v1/chat/completions";
+    const apiKey = GROQ_API_KEY ?? LOVABLE_API_KEY!;
+    const model = GROQ_API_KEY ? "llama-3.3-70b-versatile" : "google/gemini-3-flash-preview";
 
     const systemPrompt = `You are an expert business proposal writer. Your job is to improve proposal section content to be more professional, persuasive, and clear. 
 Keep the same general meaning but make it:
@@ -48,14 +56,14 @@ Section: "${sectionTitle || "Untitled Section"}"
 
 Return ONLY the improved content text. No explanations, no markdown headers, just the improved section content.`;
 
-    const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+    const response = await fetch(endpoint, {
       method: "POST",
       headers: {
-        Authorization: `Bearer ${LOVABLE_API_KEY}`,
+        Authorization: `Bearer ${apiKey}`,
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: "google/gemini-3-flash-preview",
+        model,
         messages: [
           { role: "system", content: systemPrompt },
           { role: "user", content: sectionContent || "Write initial content for this section." },
