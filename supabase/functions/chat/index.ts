@@ -6,7 +6,7 @@ import {
   tool,
   type UIMessage,
 } from "npm:ai@7";
-import { createOpenAI } from "npm:@ai-sdk/openai@4";
+import { getChatModel } from "../_shared/ai-provider.ts";
 import { z } from "npm:zod";
 
 const corsHeaders = {
