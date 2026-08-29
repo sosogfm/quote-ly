@@ -6,7 +6,7 @@ import {
   tool,
   type UIMessage,
 } from "npm:ai@7";
-import { createOpenAI } from "npm:@ai-sdk/openai@4";
+import { getChatModel } from "../_shared/ai-provider.ts";
 import { z } from "npm:zod";
 
 const corsHeaders = {
@@ -173,9 +173,8 @@ Deno.serve(async (req) => {
     }
     const userId = claimsData.claims.sub as string;
 
-    const lovableApiKey = Deno.env.get("LOVABLE_API_KEY");
-    if (!lovableApiKey) {
-      return new Response(JSON.stringify({ error: "AI is not configured." }), {
+    if (!Deno.env.get("GROQ_API_KEY") && !Deno.env.get("LOVABLE_API_KEY")) {
+      return new Response(JSON.stringify({ error: "IA não configurada." }), {
         status: 500,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
@@ -192,15 +191,8 @@ Deno.serve(async (req) => {
     const initialRunId = req.headers.get(LOVABLE_AIG_RUN_ID_HEADER)?.trim() || undefined;
     const runIdFetch = createLovableAiGatewayRunIdFetch(initialRunId);
 
-    const lovable = createOpenAI({
-      baseURL: "https://ai.gateway.lovable.dev/v1",
-      apiKey: lovableApiKey,
-      headers: {
-        "Lovable-API-Key": lovableApiKey,
-        "X-Lovable-AIG-SDK": "vercel-ai-sdk",
-      },
-      fetch: runIdFetch.fetch as typeof fetch,
-    });
+    const { model, provider, modelId } = getChatModel({ fetch: runIdFetch.fetch as typeof fetch });
+    console.log("chat: using provider", provider, modelId);
 
     const projectBlock = projectInstructions
       ? `\n\nProject context and standing instructions from the user:\n${projectInstructions}`
@@ -208,7 +200,8 @@ Deno.serve(async (req) => {
     const system = `${SYSTEM_PROMPT}${memoryBlock}${projectBlock}`;
 
     const result = streamText({
-      model: lovable.responses("openai/gpt-5.6-sol"),
+      model,
+
       system,
       messages: await convertToModelMessages(messages),
       abortSignal: req.signal,
@@ -251,16 +244,8 @@ Deno.serve(async (req) => {
           },
         }),
       },
-      providerOptions: {
-        openai: {
-          forceReasoning: true,
-          reasoningEffort: "medium",
-          reasoningSummary: "auto",
-          store: false,
-          include: ["reasoning.encrypted_content"],
-        },
-      },
     });
+
 
     return result.toUIMessageStreamResponse({
       sendReasoning: true,
