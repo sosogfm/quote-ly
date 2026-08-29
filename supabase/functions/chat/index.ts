@@ -244,16 +244,8 @@ Deno.serve(async (req) => {
           },
         }),
       },
-      providerOptions: {
-        openai: {
-          forceReasoning: true,
-          reasoningEffort: "medium",
-          reasoningSummary: "auto",
-          store: false,
-          include: ["reasoning.encrypted_content"],
-        },
-      },
     });
+
 
     return result.toUIMessageStreamResponse({
       sendReasoning: true,
