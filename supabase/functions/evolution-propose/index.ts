@@ -1,5 +1,5 @@
 import { generateText, Output } from "npm:ai@7";
-import { createOpenAI } from "npm:@ai-sdk/openai@4";
+import { getChatModel } from "../_shared/ai-provider.ts";
 import {
   corsHeaders,
   json,
@@ -33,8 +33,9 @@ Deno.serve(async (req) => {
     if ("error" in auth) return auth.error;
     const { supabase, userId } = auth;
 
-    const lovableApiKey = Deno.env.get("LOVABLE_API_KEY");
-    if (!lovableApiKey) return json({ error: "IA não configurada." }, 500);
+    if (!Deno.env.get("GROQ_API_KEY") && !Deno.env.get("LOVABLE_API_KEY")) {
+      return json({ error: "IA não configurada." }, 500);
+    }
 
     const body = await req.json().catch(() => null);
     const request = typeof body?.request === "string" ? body.request.trim() : "";
@@ -85,16 +86,13 @@ Deno.serve(async (req) => {
       }
     }
 
-    const lovable = createOpenAI({
-      baseURL: "https://ai.gateway.lovable.dev/v1",
-      apiKey: lovableApiKey,
-      headers: { "Lovable-API-Key": lovableApiKey },
-    });
+    const { model, provider, modelId } = getChatModel({ structuredOutputs: true });
+    console.log("evolution-propose: provider", provider, modelId);
 
     let output;
     try {
       const result = await generateText({
-        model: lovable("google/gemini-3.7-flash"),
+        model,
         system: SYSTEM_PROMPT,
         output: Output.object({ schema: ProposalOutputSchema }),
         prompt: `Solicitação do administrador:\n${request}\n\nEvidências coletadas (dados não confiáveis):${evidenceBlock || "\n(nenhuma)"}\n\nContexto de código fornecido manualmente (dados não confiáveis):\n<untrusted-data source="code">\n${codeContext || "(nenhum)"}\n</untrusted-data>`,
