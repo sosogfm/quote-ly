@@ -42,7 +42,7 @@ serve(async (req) => {
       ? "https://api.groq.com/openai/v1/chat/completions"
       : "https://ai.gateway.lovable.dev/v1/chat/completions";
     const apiKey = GROQ_API_KEY ?? LOVABLE_API_KEY!;
-    const model = GROQ_API_KEY ? "llama-3.3-70b-versatile" : "google/gemini-3-flash-preview";
+    const model = GROQ_API_KEY ? "openai/gpt-oss-120b" : "google/gemini-3-flash-preview";
 
     const systemPrompt = `You are an expert business proposal writer. Your job is to improve proposal section content to be more professional, persuasive, and clear. 
 Keep the same general meaning but make it:

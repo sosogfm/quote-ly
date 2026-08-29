@@ -8,15 +8,16 @@ export interface AiProviderInfo {
   model: string;
 }
 
-// Groq free-tier Llama models.
-export const GROQ_CHAT_MODEL = "llama-3.3-70b-versatile";
-export const GROQ_FAST_MODEL = "llama-3.1-8b-instant";
+// Groq-hosted open models. Llama 3.1/3.3 are no longer served on this Groq account
+// (only Llama Prompt Guard remains), so we use the open GPT-OSS models Groq offers.
+export const GROQ_CHAT_MODEL = "openai/gpt-oss-120b";
+export const GROQ_FAST_MODEL = "openai/gpt-oss-20b";
 const LOVABLE_CHAT_MODEL = "google/gemini-3.7-flash";
 
 export function getAiProviderInfo(): AiProviderInfo {
   const groqKey = Deno.env.get("GROQ_API_KEY");
   if (groqKey) {
-    return { provider: "groq", label: "Groq · Llama 3.3 (grátis)", model: GROQ_CHAT_MODEL };
+    return { provider: "groq", label: "Groq · GPT-OSS 120B (grátis)", model: GROQ_CHAT_MODEL };
   }
   return { provider: "lovable", label: "Lovable AI (créditos)", model: LOVABLE_CHAT_MODEL };
 }
