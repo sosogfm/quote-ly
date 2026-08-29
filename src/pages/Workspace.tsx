@@ -34,6 +34,8 @@ import { Shimmer } from "@/components/ai-elements/shimmer";
 import { Sparkles } from "lucide-react";
 
 const CHAT_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/chat`;
+const AI_STATUS_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/ai-status`;
+
 
 function textOf(message: UIMessage) {
   return message.parts
