@@ -203,12 +203,32 @@ Deno.serve(async (req) => {
     // prior assistant turns. Strip reasoning parts before conversion so the
     // provider never sees them (the reasoning still renders in the UI via the
     // streamed response with sendReasoning: true).
-    const messagesForModel = messages.map((m) => ({
+    const strippedMessages = messages.map((m) => ({
       ...m,
       parts: Array.isArray(m.parts)
         ? m.parts.filter((p) => p.type !== "reasoning")
         : m.parts,
     }));
+
+    // Groq's free tier caps tokens per request, so long threads must be
+    // trimmed. Keep the most recent turns within a character budget
+    // (~4 chars per token) and always keep at least the last message.
+    const HISTORY_CHAR_BUDGET = 24000;
+    const messagesForModel: typeof strippedMessages = [];
+    let used = 0;
+    for (let i = strippedMessages.length - 1; i >= 0; i--) {
+      const m = strippedMessages[i];
+      const size = JSON.stringify(m.parts ?? "").length;
+      if (messagesForModel.length > 0 && used + size > HISTORY_CHAR_BUDGET) break;
+      messagesForModel.unshift(m);
+      used += size;
+    }
+    if (messagesForModel.length < strippedMessages.length) {
+      console.log(
+        `chat: trimmed history ${strippedMessages.length} -> ${messagesForModel.length} messages (${used} chars)`,
+      );
+    }
+
 
     const result = streamText({
       model,
@@ -263,8 +283,13 @@ Deno.serve(async (req) => {
       headers: corsHeaders,
       onError: (error) => {
         console.error("chat stream error", error);
-        return error instanceof Error ? error.message : "Something went wrong generating a reply.";
+        const msg = error instanceof Error ? error.message : String(error);
+        if (/too large|context length|rate limit|tokens per/i.test(msg)) {
+          return "Esta conversa ficou grande demais para o modelo gratuito. Comece uma nova conversa (ou aguarde um minuto) e tente novamente.";
+        }
+        return msg || "Something went wrong generating a reply.";
       },
+
     });
   } catch (error) {
     if (error instanceof Error && error.name === "AbortError") {
