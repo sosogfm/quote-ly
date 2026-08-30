@@ -6,7 +6,7 @@ import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
-import { FileText, LayoutDashboard, Users, FolderOpen, PlusCircle, Settings, LogOut, User, ClipboardList, Menu } from "lucide-react";
+import { FileText, LayoutDashboard, Users, FolderOpen, PlusCircle, Settings, LogOut, User, ClipboardList, Menu, GitBranch } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const navItems = [
@@ -14,6 +14,7 @@ const navItems = [
   { to: "/proposals", icon: ClipboardList, label: "Proposals" },
   { to: "/clients", icon: Users, label: "Clients" },
   { to: "/templates", icon: FolderOpen, label: "Templates" },
+  { to: "/evolution", icon: GitBranch, label: "Evolução" },
 ];
 
 export function DashboardLayout({ children }: { children: React.ReactNode }) {

@@ -199,11 +199,22 @@ Deno.serve(async (req) => {
       : "";
     const system = `${SYSTEM_PROMPT}${memoryBlock}${projectBlock}`;
 
+    // Groq rejects `reasoning_content` parts that the AI SDK re-injects from
+    // prior assistant turns. Strip reasoning parts before conversion so the
+    // provider never sees them (the reasoning still renders in the UI via the
+    // streamed response with sendReasoning: true).
+    const messagesForModel = messages.map((m) => ({
+      ...m,
+      parts: Array.isArray(m.parts)
+        ? m.parts.filter((p) => p.type !== "reasoning")
+        : m.parts,
+    }));
+
     const result = streamText({
       model,
 
       system,
-      messages: await convertToModelMessages(messages),
+      messages: await convertToModelMessages(messagesForModel),
       abortSignal: req.signal,
       stopWhen: stepCountIs(4),
       tools: {
