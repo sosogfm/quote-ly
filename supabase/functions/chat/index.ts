@@ -283,8 +283,13 @@ Deno.serve(async (req) => {
       headers: corsHeaders,
       onError: (error) => {
         console.error("chat stream error", error);
-        return error instanceof Error ? error.message : "Something went wrong generating a reply.";
+        const msg = error instanceof Error ? error.message : String(error);
+        if (/too large|context length|rate limit|tokens per/i.test(msg)) {
+          return "Esta conversa ficou grande demais para o modelo gratuito. Comece uma nova conversa (ou aguarde um minuto) e tente novamente.";
+        }
+        return msg || "Something went wrong generating a reply.";
       },
+
     });
   } catch (error) {
     if (error instanceof Error && error.name === "AbortError") {
