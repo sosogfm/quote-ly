@@ -21,6 +21,8 @@ import ClientDetail from "./pages/ClientDetail";
 import Settings from "./pages/Settings";
 import PublicProposal from "./pages/PublicProposal";
 import Workspace from "./pages/Workspace";
+import Evolution from "./pages/Evolution";
+import EvolutionProposal from "./pages/EvolutionProposal";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -50,6 +52,8 @@ const App = () => (
             <Route path="/proposals/:id" element={<ProtectedRoute><ProposalDetail /></ProtectedRoute>} />
             <Route path="/proposals/:id/edit" element={<ProtectedRoute><ProposalBuilder /></ProtectedRoute>} />
             <Route path="/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
+            <Route path="/evolution" element={<ProtectedRoute><Evolution /></ProtectedRoute>} />
+            <Route path="/evolution/:id" element={<ProtectedRoute><EvolutionProposal /></ProtectedRoute>} />
             <Route path="/p/:shareId" element={<PublicProposal />} />
             <Route path="*" element={<NotFound />} />
           </Routes>
