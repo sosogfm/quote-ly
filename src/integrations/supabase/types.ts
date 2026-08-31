@@ -348,6 +348,10 @@ export type Database = {
           environment: string
           estimated_cost: string | null
           evidence: Json
+          github_branch: string | null
+          github_pr_number: number | null
+          github_pr_opened_at: string | null
+          github_pr_url: string | null
           id: string
           impact: string | null
           migration_confirmed_at: string | null
@@ -384,6 +388,10 @@ export type Database = {
           environment?: string
           estimated_cost?: string | null
           evidence?: Json
+          github_branch?: string | null
+          github_pr_number?: number | null
+          github_pr_opened_at?: string | null
+          github_pr_url?: string | null
           id?: string
           impact?: string | null
           migration_confirmed_at?: string | null
@@ -422,6 +430,10 @@ export type Database = {
           environment?: string
           estimated_cost?: string | null
           evidence?: Json
+          github_branch?: string | null
+          github_pr_number?: number | null
+          github_pr_opened_at?: string | null
+          github_pr_url?: string | null
           id?: string
           impact?: string | null
           migration_confirmed_at?: string | null
@@ -511,6 +523,39 @@ export type Database = {
           message?: string
           page?: string | null
           user_id?: string
+        }
+        Relationships: []
+      }
+      evolution_repo_settings: {
+        Row: {
+          auto_apply_enabled: boolean
+          base_branch: string
+          created_at: string
+          id: string
+          max_auto_risk: string
+          repo_name: string
+          repo_owner: string
+          updated_at: string
+        }
+        Insert: {
+          auto_apply_enabled?: boolean
+          base_branch?: string
+          created_at?: string
+          id?: string
+          max_auto_risk?: string
+          repo_name: string
+          repo_owner: string
+          updated_at?: string
+        }
+        Update: {
+          auto_apply_enabled?: boolean
+          base_branch?: string
+          created_at?: string
+          id?: string
+          max_auto_risk?: string
+          repo_name?: string
+          repo_owner?: string
+          updated_at?: string
         }
         Relationships: []
       }
