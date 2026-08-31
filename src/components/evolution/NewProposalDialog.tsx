@@ -26,11 +26,22 @@ export function NewProposalDialog({ onCreated }: { onCreated: () => void }) {
     });
     setLoading(false);
 
-    const message = (data as { error?: string } | null)?.error;
+    let message = (data as { error?: string } | null)?.error;
+    // Non-2xx responses come back as FunctionsHttpError: read the server message.
+    const ctx = (error as { context?: Response } | null)?.context;
+    if (!message && ctx && typeof ctx.json === "function") {
+      try {
+        const parsed = await ctx.json();
+        message = parsed?.error;
+      } catch {
+        // ignore parse failures and fall back to the generic message
+      }
+    }
     if (error || message) {
       toast.error(message ?? "Não foi possível gerar a proposta.");
       return;
     }
+
     toast.success("Proposta gerada para revisão.");
     setRequest("");
     setCodeContext("");
