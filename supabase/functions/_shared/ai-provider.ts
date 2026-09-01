@@ -1,7 +1,7 @@
 import { createOpenAICompatible } from "npm:@ai-sdk/openai-compatible@2";
 import type { LanguageModel } from "npm:ai@7";
 
-export type AiProviderName = "groq" | "openrouter" | "lovable";
+export type AiProviderName = "groq" | "openrouter" | "lovable" | "custom";
 
 export interface AiProviderInfo {
   provider: string;
@@ -19,6 +19,60 @@ export const OPENROUTER_CHAT_MODEL = "minimax/minimax-m3:free";
 export const OPENROUTER_FAST_MODEL = "minimax/minimax-m3:free";
 const LOVABLE_CHAT_MODEL = "google/gemini-3.7-flash";
 
+export interface AiSettings {
+  provider_order: string[];
+  groq_chat_model: string;
+  groq_fast_model: string;
+  openrouter_chat_model: string;
+  openrouter_fast_model: string;
+  lovable_chat_model: string;
+  custom_enabled: boolean;
+  custom_label: string;
+  custom_base_url: string | null;
+  custom_chat_model: string | null;
+  custom_fast_model: string | null;
+  custom_supports_structured: boolean;
+}
+
+export const DEFAULT_AI_SETTINGS: AiSettings = {
+  provider_order: ["custom", "groq", "openrouter", "lovable"],
+  groq_chat_model: GROQ_CHAT_MODEL,
+  groq_fast_model: GROQ_FAST_MODEL,
+  openrouter_chat_model: OPENROUTER_CHAT_MODEL,
+  openrouter_fast_model: OPENROUTER_FAST_MODEL,
+  lovable_chat_model: LOVABLE_CHAT_MODEL,
+  custom_enabled: false,
+  custom_label: "Local",
+  custom_base_url: null,
+  custom_chat_model: null,
+  custom_fast_model: null,
+  custom_supports_structured: false,
+};
+
+let settingsCache: { at: number; value: AiSettings } | null = null;
+
+/** Loads admin-configured AI settings (cached 20s). Falls back to defaults. */
+export async function loadAiSettings(): Promise<AiSettings> {
+  if (settingsCache && Date.now() - settingsCache.at < 20_000) return settingsCache.value;
+  try {
+    const url = Deno.env.get("SUPABASE_URL");
+    const key = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+    if (!url || !key) return DEFAULT_AI_SETTINGS;
+    const res = await fetch(`${url}/rest/v1/ai_settings?id=eq.global&select=*`, {
+      headers: { apikey: key, Authorization: `Bearer ${key}` },
+    });
+    if (!res.ok) return DEFAULT_AI_SETTINGS;
+    const rows = await res.json();
+    const row = Array.isArray(rows) ? rows[0] : null;
+    if (!row) return DEFAULT_AI_SETTINGS;
+    const value: AiSettings = { ...DEFAULT_AI_SETTINGS, ...row };
+    settingsCache = { at: Date.now(), value };
+    return value;
+  } catch {
+    return DEFAULT_AI_SETTINGS;
+  }
+}
+
 export interface ChainEntry {
   name: AiProviderName;
   model: LanguageModel;
@@ -34,15 +88,28 @@ interface ProviderConfig {
   supportsStructuredOutputs: boolean;
 }
 
-function providerConfigs(fast: boolean): ProviderConfig[] {
-  const configs: ProviderConfig[] = [];
+async function providerConfigs(fast: boolean): Promise<ProviderConfig[]> {
+  const settings = await loadAiSettings();
+  const byName = new Map<AiProviderName, ProviderConfig>();
+
+  if (settings.custom_enabled && settings.custom_base_url) {
+    const customKey = Deno.env.get("CUSTOM_AI_API_KEY");
+    byName.set("custom", {
+      name: "custom",
+      baseURL: settings.custom_base_url.replace(/\/+$/, ""),
+      modelId: (fast ? settings.custom_fast_model : settings.custom_chat_model) ||
+        settings.custom_chat_model || settings.custom_fast_model || "local-model",
+      headers: customKey ? { Authorization: `Bearer ${customKey}` } : {},
+      supportsStructuredOutputs: settings.custom_supports_structured,
+    });
+  }
 
   const groqKey = Deno.env.get("GROQ_API_KEY");
   if (groqKey) {
-    configs.push({
+    byName.set("groq", {
       name: "groq",
       baseURL: "https://api.groq.com/openai/v1",
-      modelId: fast ? GROQ_FAST_MODEL : GROQ_CHAT_MODEL,
+      modelId: fast ? settings.groq_fast_model : settings.groq_chat_model,
       headers: { Authorization: `Bearer ${groqKey}` },
       supportsStructuredOutputs: true,
     });
@@ -50,10 +117,10 @@ function providerConfigs(fast: boolean): ProviderConfig[] {
 
   const orKey = Deno.env.get("OPENROUTER_API_KEY");
   if (orKey) {
-    configs.push({
+    byName.set("openrouter", {
       name: "openrouter",
       baseURL: "https://openrouter.ai/api/v1",
-      modelId: fast ? OPENROUTER_FAST_MODEL : OPENROUTER_CHAT_MODEL,
+      modelId: fast ? settings.openrouter_fast_model : settings.openrouter_chat_model,
       headers: {
         Authorization: `Bearer ${orKey}`,
         "HTTP-Referer": "https://quote-ly.lovable.app",
@@ -65,10 +132,10 @@ function providerConfigs(fast: boolean): ProviderConfig[] {
 
   const lovableApiKey = Deno.env.get("LOVABLE_API_KEY");
   if (lovableApiKey) {
-    configs.push({
+    byName.set("lovable", {
       name: "lovable",
       baseURL: "https://ai.gateway.lovable.dev/v1",
-      modelId: LOVABLE_CHAT_MODEL,
+      modelId: settings.lovable_chat_model,
       headers: {
         "Lovable-API-Key": lovableApiKey,
         "X-Lovable-AIG-SDK": "vercel-ai-sdk",
@@ -77,6 +144,16 @@ function providerConfigs(fast: boolean): ProviderConfig[] {
     });
   }
 
+  const order = settings.provider_order?.length
+    ? settings.provider_order
+    : DEFAULT_AI_SETTINGS.provider_order;
+  const configs: ProviderConfig[] = [];
+  for (const name of order) {
+    const c = byName.get(name as AiProviderName);
+    if (c) { configs.push(c); byName.delete(name as AiProviderName); }
+  }
+  // Anything configured but not listed in the order goes last.
+  for (const c of byName.values()) configs.push(c);
   return configs;
 }
 
@@ -84,14 +161,14 @@ function providerConfigs(fast: boolean): ProviderConfig[] {
  * Returns the active provider chain in priority order (Groq → OpenRouter → Lovable).
  * Each entry has a model built with the right structuredOutputs setting for that provider.
  */
-export function getProviderChain(options?: {
+export async function getProviderChain(options?: {
   fast?: boolean;
   structuredOutputs?: boolean;
   fetch?: typeof fetch;
-}): ChainEntry[] {
+}): Promise<ChainEntry[]> {
   const fast = options?.fast ?? false;
   const wantStructured = options?.structuredOutputs ?? false;
-  const configs = providerConfigs(fast);
+  const configs = await providerConfigs(fast);
 
   const chain: ChainEntry[] = [];
   for (const c of configs) {
@@ -121,12 +198,12 @@ export function getProviderChain(options?: {
  * Returns a language model for the primary provider (first in the chain).
  * Kept for backward compatibility with simple call sites.
  */
-export function getChatModel(options?: {
+export async function getChatModel(options?: {
   fast?: boolean;
   structuredOutputs?: boolean;
   fetch?: typeof fetch;
 }) {
-  const chain = getProviderChain(options);
+  const chain = await getProviderChain(options);
   const primary = chain[0];
   return { model: primary.model, provider: primary.name, modelId: primary.modelId };
 }
@@ -146,7 +223,7 @@ export async function generateWithFallback<T>(
   },
   run: (model: LanguageModel) => Promise<T>,
 ): Promise<T> {
-  const chain = getProviderChain(options);
+  const chain = await getProviderChain(options);
   let lastError: unknown;
   for (const entry of chain) {
     try {
@@ -178,11 +255,11 @@ function isFallbackableError(err: unknown): boolean {
  * chat where the AI SDK drives a single fetch call — this keeps fallback
  * transparent without touching the stream serialization.
  */
-export function createChainFallbackFetch(
+export async function createChainFallbackFetch(
   options?: { fast?: boolean; fetch?: typeof fetch },
-): typeof fetch {
+): Promise<typeof fetch> {
   const innerFetch = options?.fetch ?? fetch;
-  const configs = providerConfigs(options?.fast ?? false);
+  const configs = await providerConfigs(options?.fast ?? false);
   // Fallback targets = everything after the primary.
   const fallbacks = configs.slice(1);
 
@@ -220,18 +297,20 @@ export function createChainFallbackFetch(
   };
 }
 
-export function getAiProviderInfo(): AiProviderInfo {
-  const configs = providerConfigs(false);
+export async function getAiProviderInfo(): Promise<AiProviderInfo> {
+  const configs = await providerConfigs(false);
   if (configs.length === 0) {
     return { provider: "none", label: "IA não configurada", model: "", chain: [] };
   }
   const primary = configs[0];
   const chain = configs.map((c) => c.name);
 
+  const settings = await loadAiSettings();
   const display: Record<AiProviderName, string> = {
     groq: "Groq",
     openrouter: "OpenRouter",
     lovable: "Lovable",
+    custom: settings.custom_label || "Local",
   };
 
   // Lovable is the paid last resort — only surface it in the label when it's
