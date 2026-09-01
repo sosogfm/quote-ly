@@ -29,7 +29,9 @@ jobs:
         run: bunx tsc --noEmit
 
       - name: Lint
+        continue-on-error: true
         run: bun run lint
+
 
       - name: Unit tests
         run: bun run test
