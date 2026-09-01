@@ -36,6 +36,7 @@ import {
   RotateCcw,
   ShieldAlert,
   Undo2,
+  Wrench,
 } from "lucide-react";
 
 type TaskRow = {
@@ -90,6 +91,7 @@ export default function EvolutionProposal() {
   const [reason, setReason] = useState("");
   const [approveOpen, setApproveOpen] = useState(false);
   const [criticalOpen, setCriticalOpen] = useState(false);
+  const [fixing, setFixing] = useState(false);
 
   const load = useCallback(async () => {
     if (!id) return;
@@ -184,16 +186,10 @@ export default function EvolutionProposal() {
     load();
   };
 
-  const runAiTests = async () => {
-    if (!id) return;
-    setActing(true);
-    const { data, error } = await supabase.functions.invoke("evolution-test", {
-      body: { taskId: id },
-    });
-    setActing(false);
-
+  const invokeFn = async (name: string, fallbackMessage: string) => {
+    const { data, error } = await supabase.functions.invoke(name, { body: { taskId: id } });
     if (error) {
-      let message = "Não foi possível rodar os testes automáticos.";
+      let message = fallbackMessage;
       try {
         const ctx = (error as { context?: Response }).context;
         if (ctx) {
@@ -203,33 +199,75 @@ export default function EvolutionProposal() {
       } catch {
         /* keeps the generic message */
       }
-      toast.error(message);
-      return;
+      return { error: message };
     }
     if (data && typeof data === "object" && "error" in data) {
-      toast.error(String((data as { error: string }).error));
+      return { error: String((data as { error: string }).error) };
+    }
+    return { data: (data ?? {}) as Record<string, unknown> };
+  };
+
+  const autoFix = async (options?: { silentWhenNothingToFix?: boolean }) => {
+    if (!id) return false;
+    setFixing(true);
+    const res = await invokeFn("evolution-fix", "Não foi possível corrigir a proposta com a IA.");
+    setFixing(false);
+
+    if (res.error) {
+      if (!options?.silentWhenNothingToFix || !/nada para corrigir/i.test(res.error)) {
+        toast.error(res.error);
+      }
+      return false;
+    }
+    const out = res.data as { summary?: string; notes?: string; approach_changed?: boolean };
+    toast.success(
+      out.approach_changed
+        ? `Abordagem alterada: ${out.summary ?? "patches refeitos pela IA."}`
+        : `Correção aplicada aos patches: ${out.summary ?? "patches atualizados."}`,
+      { description: out.notes?.slice(0, 200) },
+    );
+    await load();
+    return true;
+  };
+
+  const runAiTests = async (options?: { autoFix?: boolean }) => {
+    if (!id) return;
+    setActing(true);
+    const res = await invokeFn("evolution-test", "Não foi possível rodar os testes automáticos.");
+    setActing(false);
+
+    if (res.error) {
+      toast.error(res.error);
       return;
     }
-    const res = (data ?? {}) as {
+    const out = res.data as {
       failed?: number;
       pending?: number;
       mode?: string;
       summary?: string;
     };
-    const failed = res.failed ?? 0;
-    const pending = res.pending ?? 0;
-    const prefix = res.mode === "real" ? "CI real" : "Revisão estática";
+    const failed = out.failed ?? 0;
+    const pending = out.pending ?? 0;
+    const prefix = out.mode === "real" ? "CI real" : "Revisão estática";
     if (pending > 0) {
-      toast.info(res.summary ?? `${prefix}: testes ainda em andamento.`);
+      toast.info(out.summary ?? `${prefix}: testes ainda em andamento.`);
     } else {
       toast[failed > 0 ? "warning" : "success"](
-        res.summary ??
+        out.summary ??
           (failed > 0 ? `${prefix}: ${failed} falharam.` : `${prefix}: todos passaram.`),
       );
     }
 
-    load();
+    await load();
+
+    // Auto-correction loop: failures found -> AI rewrites the patches, then re-tests once.
+    if (failed > 0 && pending === 0 && options?.autoFix !== false) {
+      toast.info("Falhas detectadas — a IA está corrigindo os patches...");
+      const fixed = await autoFix({ silentWhenNothingToFix: true });
+      if (fixed) await runAiTests({ autoFix: false });
+    }
   };
+
 
 
   if (loading) {
@@ -360,7 +398,11 @@ export default function EvolutionProposal() {
 
           <TabsContent value="tests" className="space-y-3 pt-4">
             <div className="flex flex-wrap items-center gap-2">
-              <Button size="sm" disabled={acting || files.length === 0} onClick={runAiTests}>
+              <Button
+                size="sm"
+                disabled={acting || fixing || files.length === 0}
+                onClick={() => runAiTests()}
+              >
                 {acting ? (
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                 ) : (
@@ -368,9 +410,23 @@ export default function EvolutionProposal() {
                 )}
                 Rodar testes
               </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                disabled={acting || fixing || !tests.some((t) => t.result === "failed")}
+                onClick={() => autoFix()}
+              >
+                {fixing ? (
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                ) : (
+                  <Wrench className="mr-2 h-4 w-4" />
+                )}
+                Corrigir com IA
+              </Button>
               <span className="text-xs text-muted-foreground">
                 Com Pull Request aberto, busca o resultado real do CI (lint, tipos, testes, build).
-                Sem PR, faz revisão estática determinística do diff.
+                Sem PR, faz revisão estática determinística do diff. Se algum teste falhar, a IA
+                corrige os patches (ou muda a abordagem) e roda os testes de novo automaticamente.
               </span>
 
             </div>
