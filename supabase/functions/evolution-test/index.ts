@@ -2,7 +2,7 @@
 // Preferred mode: REAL — reads GitHub Actions check runs for the proposal's branch/PR.
 // Fallback mode: STATIC — deterministic AI review (temperature 0) when there is no branch/CI yet.
 import { corsHeaders, json, requireAdmin } from "../_shared/evolution.ts";
-import { getChatModel, describeAiError } from "../_shared/ai-provider.ts";
+import { generateWithFallback, describeAiError } from "../_shared/ai-provider.ts";
 import { gh, githubConfigured } from "../_shared/github.ts";
 import { generateText, Output } from "npm:ai@7";
 import { z } from "npm:zod";
@@ -186,15 +186,16 @@ Deno.serve(async (req) => {
 
     let output: z.infer<typeof TestPlanSchema>;
     try {
-      const { model } = getChatModel({ structuredOutputs: true });
-      const result = await generateText({
-        model,
-        output: Output.object({ schema: TestPlanSchema }),
-        temperature: 0,
-        seed: 7,
-        system: SYSTEM_PROMPT,
-        prompt: `Proposta: ${task.title}\n\nProblema: ${task.problem ?? "-"}\n\nSolução: ${task.solution ?? "-"}\n\nArquivos alterados:\n\n${filesBlock}`,
-      });
+      const result = await generateWithFallback({ structuredOutputs: true }, (model) =>
+        generateText({
+          model,
+          output: Output.object({ schema: TestPlanSchema }),
+          temperature: 0,
+          seed: 7,
+          system: SYSTEM_PROMPT,
+          prompt: `Proposta: ${task.title}\n\nProblema: ${task.problem ?? "-"}\n\nSolução: ${task.solution ?? "-"}\n\nArquivos alterados:\n\n${filesBlock}`,
+        }),
+      );
       output = TestPlanSchema.parse(result.output);
     } catch (err) {
       console.error("evolution-test IA erro:", (err as Error)?.message);

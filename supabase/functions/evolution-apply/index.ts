@@ -1,5 +1,5 @@
 // Applies an approved evolution proposal to the code repository by opening a Pull Request.
-import { generateText } from "npm:ai@7";
+import { streamText } from "npm:ai@7";
 import {
   corsHeaders,
   json,
@@ -8,7 +8,7 @@ import {
   isForbiddenPath,
   type ProposalState,
 } from "../_shared/evolution.ts";
-import { getChatModel, describeAiError } from "../_shared/ai-provider.ts";
+import { generateWithFallback, describeAiError } from "../_shared/ai-provider.ts";
 import { gh, githubConfigured, b64encode, b64decode, GithubError } from "../_shared/github.ts";
 
 const RISK_ORDER = ["low", "medium", "high", "critical"] as const;
@@ -22,38 +22,108 @@ type FileRow = {
   reason: string | null;
 };
 
-/** Produces the full new file content for a change, using the patch when needed. */
-async function resolveContent(file: FileRow, currentContent: string | null): Promise<string> {
-  if (file.new_content && file.new_content.trim().length > 0) return file.new_content;
-  if (!file.patch || file.patch.trim().length === 0) {
-    throw new Error(`Sem conteúdo nem patch para ${file.path}.`);
+/**
+ * Resolves the final content of EVERY file that needs AI in a SINGLE model call.
+ * Files that already have `new_content` are returned as-is without touching the model.
+ * This collapses N per-file calls into 1, which is what was triggering Groq rate
+ * limits (429) when opening a PR with multiple files.
+ */
+async function resolveAllContents(
+  files: FileRow[],
+  currentContents: Map<string, string | null>,
+): Promise<Map<string, string>> {
+  const resolved = new Map<string, string>();
+
+  // Pass through files that already have final content.
+  const needAi: FileRow[] = [];
+  for (const file of files) {
+    if (file.change_type === "deleted") continue;
+    if (file.new_content && file.new_content.trim().length > 0) {
+      resolved.set(file.path, normalizeContent(file.new_content));
+    } else if (!file.patch || file.patch.trim().length === 0) {
+      throw new Error(`Sem conteúdo nem patch para ${file.path}.`);
+    } else {
+      needAi.push(file);
+    }
   }
 
-  const { model } = getChatModel();
-  const { text } = await generateText({
-    model,
-    system:
-      "Você aplica patches em arquivos de código. Responda APENAS com o conteúdo final completo do arquivo, " +
-      "sem cercas de markdown, sem comentários extras, sem explicações. Preserve o estilo do projeto.",
-    prompt: [
-      `Arquivo: ${file.path}`,
-      `Tipo de mudança: ${file.change_type}`,
-      file.reason ? `Objetivo: ${file.reason}` : "",
-      currentContent === null
-        ? "O arquivo ainda não existe no repositório. Gere-o do zero."
-        : `Conteúdo atual:\n<<<ATUAL\n${currentContent}\nATUAL>>>`,
-      `Mudança proposta (patch ou descrição):\n<<<PATCH\n${file.patch}\nPATCH>>>`,
-      "Retorne o conteúdo final completo do arquivo.",
-    ]
-      .filter(Boolean)
-      .join("\n\n"),
-  });
+  if (needAi.length === 0) return resolved;
 
-  let out = text.trim();
+  // Build a single prompt describing every file that still needs resolving.
+  const fileBlocks = needAi
+    .map((file, i) => {
+      const cur = currentContents.get(file.path) ?? null;
+      return [
+        `### FILE_${i + 1}: ${file.path}`,
+        `change_type: ${file.change_type}`,
+        file.reason ? `objective: ${file.reason}` : "",
+        cur === null
+          ? "current: (file does not exist yet — generate from scratch)"
+          : `current:\n<<<CURRENT\n${cur}\nCURRENT>>>`,
+        `patch:\n<<<PATCH\n${file.patch}\nPATCH>>>`,
+      ]
+        .filter(Boolean)
+        .join("\n");
+    })
+    .join("\n\n");
+
+  const fileList = needAi.map((f, i) => `FILE_${i + 1}: ${f.path}`).join("\n");
+
+  // Use streaming consumed server-side so long generations (many files) keep the
+  // connection alive instead of being severed after ~2min of silence.
+  const text = await generateWithFallback({}, (model) =>
+    streamText({
+      model,
+      system:
+        "Você aplica patches em arquivos de código. Responda APENAS com um único objeto JSON válido " +
+        "mapeando cada caminho de arquivo ao seu conteúdo final completo. " +
+        'Formato EXATO: { "<caminho>": "<conteúdo completo do arquivo>", ... }. ' +
+        "Sem cercas de markdown, sem explicações, sem comentários extras. Preserve o estilo do projeto. " +
+        "Cada valor deve ser o conteúdo final COMPLETO do arquivo (não um diff).",
+      prompt: [
+        `Resolva os patches abaixo e devolva o conteúdo final de cada arquivo como JSON.`,
+        `Arquivos a resolver:\n${fileList}`,
+        `Dados:\n${fileBlocks}`,
+        `Devolva um JSON objeto com EXATAMENTE estas chaves: ${needAi.map((f) => `"${f.path}"`).join(", ")}.`,
+      ].join("\n\n"),
+    }).then((r) => r.text),
+  );
+
+  let parsed: Record<string, string>;
+  try {
+    parsed = JSON.parse(stripCodeFence(text));
+  } catch {
+    throw new Error("A IA não devolveu um JSON válido com o conteúdo dos arquivos.");
+  }
+
+  for (const file of needAi) {
+    const content = parsed[file.path];
+    if (!content || !content.trim()) {
+      throw new Error(`A IA não gerou conteúdo para ${file.path}.`);
+    }
+    resolved.set(file.path, normalizeContent(content));
+  }
+
+  return resolved;
+}
+
+function normalizeContent(content: string): string {
+  let out = content.trim();
   const fence = out.match(/^```[a-zA-Z0-9]*\n([\s\S]*?)\n```$/);
   if (fence) out = fence[1];
-  if (!out) throw new Error(`A IA não gerou conteúdo para ${file.path}.`);
   return `${out}\n`.replace(/\n+$/, "\n");
+}
+
+function stripCodeFence(text: string): string {
+  let out = text.trim();
+  const fence = out.match(/^```(?:json)?\s*\n([\s\S]*?)\n```$/);
+  if (fence) out = fence[1];
+  // If the model wrapped the whole object but left trailing prose, cut at the
+  // first balanced object. Take the substring from first { to last }.
+  const start = out.indexOf("{");
+  const end = out.lastIndexOf("}");
+  if (start !== -1 && end !== -1 && end > start) out = out.slice(start, end + 1);
+  return out;
 }
 
 Deno.serve(async (req) => {
@@ -157,27 +227,47 @@ Deno.serve(async (req) => {
       body: { ref: `refs/heads/${branch}`, sha: baseSha },
     });
 
-    // 3. Commit each file
-    const changed: string[] = [];
+    // 3. Fetch current contents for every non-deleted file in one pass.
+    const currentContents = new Map<string, string | null>();
+    const existingShas = new Map<string, string>();
     for (const file of list) {
+      if (file.change_type === "deleted") continue;
       const path = file.path.replace(/^\.?\//, "");
-      let existing: { sha: string; content: string } | null = null;
       try {
         const res = await gh<{ sha: string; content: string; encoding: string }>(
           `repos/${owner}/${repo}/contents/${encodeURI(path)}?ref=${encodeURIComponent(branch)}`,
         );
-        existing = { sha: res.sha, content: res.encoding === "base64" ? b64decode(res.content) : res.content };
+        currentContents.set(path, res.encoding === "base64" ? b64decode(res.content) : res.content);
+        existingShas.set(path, res.sha);
       } catch (err) {
         if (!(err instanceof GithubError) || err.status !== 404) throw err;
+        currentContents.set(path, null);
       }
+    }
+
+    // 4. Resolve ALL file contents in a SINGLE AI call (was: one call per file).
+    let resolved: Map<string, string>;
+    try {
+      resolved = await resolveAllContents(list, currentContents);
+    } catch (err) {
+      const ai = describeAiError(err);
+      console.error("evolution-apply resolve erro:", (err as Error)?.message);
+      return json({ error: ai.message || "Erro ao gerar o conteúdo dos arquivos." }, ai.status || 500);
+    }
+
+    // 5. Commit each file (deletes handled inline).
+    const changed: string[] = [];
+    for (const file of list) {
+      const path = file.path.replace(/^\.?\//, "");
 
       if (file.change_type === "deleted") {
-        if (!existing) continue;
+        const sha = existingShas.get(path);
+        if (!sha) continue;
         await gh(`repos/${owner}/${repo}/contents/${encodeURI(path)}`, {
           method: "DELETE",
           body: {
             message: `chore(evolution): remove ${path}`,
-            sha: existing.sha,
+            sha,
             branch,
           },
         });
@@ -185,18 +275,22 @@ Deno.serve(async (req) => {
         continue;
       }
 
-      const content = await resolveContent(file, existing?.content ?? null);
+      const content = resolved.get(path);
+      if (!content) {
+        throw new Error(`Conteúdo não resolvido para ${path}.`);
+      }
       await gh(`repos/${owner}/${repo}/contents/${encodeURI(path)}`, {
         method: "PUT",
         body: {
           message: `feat(evolution): ${file.reason?.slice(0, 60) || path}`,
           content: b64encode(content),
           branch,
-          ...(existing ? { sha: existing.sha } : {}),
+          ...(existingShas.has(path) ? { sha: existingShas.get(path) } : {}),
         },
       });
       changed.push(path);
 
+      // Persist resolved content so a re-apply never calls the model again.
       await supabase
         .from("dev_task_files")
         .update({ new_content: content })
@@ -207,7 +301,7 @@ Deno.serve(async (req) => {
       return json({ error: "Nenhuma alteração pôde ser aplicada." }, 400);
     }
 
-    // 4. Pull Request
+    // 6. Pull Request
     const prBody = [
       `Proposta gerada pela Central de Evolução (risco: **${task.risk_level}**).`,
       task.problem ? `\n### Problema\n${task.problem}` : "",

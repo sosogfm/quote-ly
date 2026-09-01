@@ -16,3 +16,7 @@
 - [ ] Phase 5: Site Maker (Lovable-style live preview)
 - [ ] Phase 6: Feedback loop + skills
 - [ ] Phase 7: MCPs + connectors
+
+## In progress
+- [ ] Fallback OpenRouter (grátis) + batching do evolution-apply (cadeia Groq → OpenRouter → Lovable)
+- [x] Fix build error: remover dead `src/edge-functions/conversations.ts` (importava next/server)
