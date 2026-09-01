@@ -20,6 +20,7 @@ import {
   ArrowLeft,
   Database,
   Loader2,
+  Github,
   RotateCcw,
   ShieldAlert,
   Undo2,
@@ -41,6 +42,7 @@ type TaskRow = {
   requires_migration: boolean;
   migration_confirmed_at: string | null;
   applied_at: string | null;
+  github_pr_url: string | null;
   plan_approved_at: string | null;
   created_at: string;
 };
@@ -83,7 +85,7 @@ export default function EvolutionProposal() {
       supabase
         .from("dev_tasks")
         .select(
-          "id, title, request, problem, evidence, solution, impact, state, risk_level, risks, rollback_plan, estimated_cost, requires_migration, migration_confirmed_at, applied_at, plan_approved_at, created_at",
+          "id, title, request, problem, evidence, solution, impact, state, risk_level, risks, rollback_plan, estimated_cost, requires_migration, migration_confirmed_at, applied_at, github_pr_url, plan_approved_at, created_at",
         )
         .eq("id", id)
         .eq("source", "evolution")
@@ -137,6 +139,37 @@ export default function EvolutionProposal() {
     setApproveOpen(false);
     load();
   };
+
+  const applyToGithub = async () => {
+    if (!id) return;
+    setActing(true);
+    const { data, error } = await supabase.functions.invoke("evolution-apply", {
+      body: { taskId: id },
+    });
+    setActing(false);
+
+    if (error) {
+      let message = "Não foi possível abrir o Pull Request.";
+      try {
+        const ctx = (error as { context?: Response }).context;
+        if (ctx) {
+          const parsed = await ctx.json();
+          if (parsed?.error) message = String(parsed.error);
+        }
+      } catch {
+        /* keeps the generic message */
+      }
+      toast.error(message);
+      return;
+    }
+    if (data && typeof data === "object" && "error" in data) {
+      toast.error(String((data as { error: string }).error));
+      return;
+    }
+    toast.success("Pull Request aberto no GitHub.");
+    load();
+  };
+
 
   if (loading) {
     return (
@@ -367,7 +400,30 @@ export default function EvolutionProposal() {
               </label>
             )}
 
+            {task.github_pr_url && (
+              <a
+                href={task.github_pr_url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center gap-2 rounded-md border border-border bg-muted/40 p-3 text-sm hover:border-primary/50"
+              >
+                <Github className="h-4 w-4" />
+                Pull Request aberto no GitHub — abrir para revisar e fazer o merge
+              </a>
+            )}
+
             <div className="flex flex-wrap gap-2">
+              {state === "approved" && !task.github_pr_url && risk !== "critical" && (
+                <Button disabled={acting} onClick={applyToGithub}>
+                  {acting ? (
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  ) : (
+                    <Github className="mr-2 h-4 w-4" />
+                  )}
+                  Aplicar via GitHub (abrir PR)
+                </Button>
+              )}
+
               {isTransitionAllowed("approve", state) && (
                 <Button disabled={acting} onClick={() => setApproveOpen(true)}>
                   Aprovar

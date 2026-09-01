@@ -1,5 +1,5 @@
 // Applies an approved evolution proposal to the code repository by opening a Pull Request.
-import { generateText } from "npm:ai@5";
+import { generateText } from "npm:ai@7";
 import {
   corsHeaders,
   json,
@@ -75,7 +75,7 @@ Deno.serve(async (req) => {
     const { data: task } = await supabase
       .from("dev_tasks")
       .select(
-        "id, title, state, risk_level, requires_migration, migration_confirmed_at, plan_approved_at, problem_statement, rollback_plan, github_pr_url, source",
+        "id, title, state, risk_level, requires_migration, migration_confirmed_at, plan_approved_at, problem, rollback_plan, github_pr_url, source",
       )
       .eq("id", taskId)
       .eq("source", "evolution")
@@ -206,7 +206,7 @@ Deno.serve(async (req) => {
     // 4. Pull Request
     const prBody = [
       `Proposta gerada pela Central de Evolução (risco: **${task.risk_level}**).`,
-      task.problem_statement ? `\n### Problema\n${task.problem_statement}` : "",
+      task.problem ? `\n### Problema\n${task.problem}` : "",
       task.rollback_plan ? `\n### Plano de rollback\n${task.rollback_plan}` : "",
       `\n### Arquivos\n${changed.map((p) => `- \`${p}\``).join("\n")}`,
       `\nAprovada por humano em ${task.plan_approved_at}.`,
