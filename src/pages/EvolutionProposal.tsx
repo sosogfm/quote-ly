@@ -170,6 +170,39 @@ export default function EvolutionProposal() {
     load();
   };
 
+  const runAiTests = async () => {
+    if (!id) return;
+    setActing(true);
+    const { data, error } = await supabase.functions.invoke("evolution-test", {
+      body: { taskId: id },
+    });
+    setActing(false);
+
+    if (error) {
+      let message = "Não foi possível rodar os testes automáticos.";
+      try {
+        const ctx = (error as { context?: Response }).context;
+        if (ctx) {
+          const parsed = await ctx.json();
+          if (parsed?.error) message = String(parsed.error);
+        }
+      } catch {
+        /* keeps the generic message */
+      }
+      toast.error(message);
+      return;
+    }
+    if (data && typeof data === "object" && "error" in data) {
+      toast.error(String((data as { error: string }).error));
+      return;
+    }
+    const failed = (data as { failed?: number })?.failed ?? 0;
+    toast[failed > 0 ? "warning" : "success"](
+      failed > 0 ? `Testes concluídos: ${failed} falharam.` : "Todos os testes passaram.",
+    );
+    load();
+  };
+
 
   if (loading) {
     return (
