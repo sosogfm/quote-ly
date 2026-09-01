@@ -210,10 +210,24 @@ export default function EvolutionProposal() {
       toast.error(String((data as { error: string }).error));
       return;
     }
-    const failed = (data as { failed?: number })?.failed ?? 0;
-    toast[failed > 0 ? "warning" : "success"](
-      failed > 0 ? `Testes concluídos: ${failed} falharam.` : "Todos os testes passaram.",
-    );
+    const res = (data ?? {}) as {
+      failed?: number;
+      pending?: number;
+      mode?: string;
+      summary?: string;
+    };
+    const failed = res.failed ?? 0;
+    const pending = res.pending ?? 0;
+    const prefix = res.mode === "real" ? "CI real" : "Revisão estática";
+    if (pending > 0) {
+      toast.info(res.summary ?? `${prefix}: testes ainda em andamento.`);
+    } else {
+      toast[failed > 0 ? "warning" : "success"](
+        res.summary ??
+          (failed > 0 ? `${prefix}: ${failed} falharam.` : `${prefix}: todos passaram.`),
+      );
+    }
+
     load();
   };
 
