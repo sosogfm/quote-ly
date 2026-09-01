@@ -210,10 +210,24 @@ export default function EvolutionProposal() {
       toast.error(String((data as { error: string }).error));
       return;
     }
-    const failed = (data as { failed?: number })?.failed ?? 0;
-    toast[failed > 0 ? "warning" : "success"](
-      failed > 0 ? `Testes concluídos: ${failed} falharam.` : "Todos os testes passaram.",
-    );
+    const res = (data ?? {}) as {
+      failed?: number;
+      pending?: number;
+      mode?: string;
+      summary?: string;
+    };
+    const failed = res.failed ?? 0;
+    const pending = res.pending ?? 0;
+    const prefix = res.mode === "real" ? "CI real" : "Revisão estática";
+    if (pending > 0) {
+      toast.info(res.summary ?? `${prefix}: testes ainda em andamento.`);
+    } else {
+      toast[failed > 0 ? "warning" : "success"](
+        res.summary ??
+          (failed > 0 ? `${prefix}: ${failed} falharam.` : `${prefix}: todos passaram.`),
+      );
+    }
+
     load();
   };
 
@@ -352,11 +366,13 @@ export default function EvolutionProposal() {
                 ) : (
                   <FlaskConical className="mr-2 h-4 w-4" />
                 )}
-                Rodar testes com IA
+                Rodar testes
               </Button>
               <span className="text-xs text-muted-foreground">
-                Análise estática do diff feita pela IA (não executa o código).
+                Com Pull Request aberto, busca o resultado real do CI (lint, tipos, testes, build).
+                Sem PR, faz revisão estática determinística do diff.
               </span>
+
             </div>
             {tests.length === 0 ? (
               <p className="text-sm text-muted-foreground">Nenhum teste definido nesta proposta.</p>
