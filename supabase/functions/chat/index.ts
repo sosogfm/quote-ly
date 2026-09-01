@@ -79,13 +79,14 @@ interface MemoryContext {
   writingStyle: string | null;
   memories: { kind: string; content: string; importance: number }[];
   recentThreads: { title: string; updatedAt: string }[];
+  recentExchanges: { role: string; text: string }[];
 }
 
 async function loadMemoryContext(
   supabase: ReturnType<typeof createClient>,
   userId: string,
 ): Promise<MemoryContext> {
-  const [summaryRes, memoriesRes, threadsRes] = await Promise.all([
+  const [summaryRes, memoriesRes, threadsRes, recentRes] = await Promise.all([
     supabase
       .from("user_profile_summary")
       .select("summary, writing_style")
@@ -104,6 +105,15 @@ async function loadMemoryContext(
       .eq("user_id", userId)
       .order("updated_at", { ascending: false })
       .limit(8),
+    // Cross-thread recall: the last things the user actually said, so the
+    // assistant remembers topics discussed in *other* conversations.
+    supabase
+      .from("chat_messages")
+      .select("role, text_content, created_at")
+      .eq("user_id", userId)
+      .eq("role", "user")
+      .order("created_at", { ascending: false })
+      .limit(20),
   ]);
 
   return {
@@ -118,6 +128,10 @@ async function loadMemoryContext(
       title: string;
       updatedAt: string;
     }[],
+    recentExchanges: ((recentRes.data ?? []) as { role: string; text_content: string | null }[])
+      .filter((r) => (r.text_content ?? "").trim().length > 0)
+      .map((r) => ({ role: r.role, text: (r.text_content ?? "").slice(0, 300) }))
+      .reverse(),
   };
 }
 
@@ -140,6 +154,12 @@ function buildMemoryBlock(ctx: MemoryContext): string {
       .map((t) => `- ${t.title}`)
       .join("\n");
     parts.push(`### Recent conversations (for continuity)\n${titles}`);
+  }
+  if (ctx.recentExchanges.length > 0) {
+    const lines = ctx.recentExchanges.map((m) => `- ${m.text}`).join("\n");
+    parts.push(
+      `### Things the user recently said in other conversations (oldest first)\n${lines}`,
+    );
   }
   return parts.length > 0
     ? `\n\n## User memory (private, scoped to this account)\n${parts.join("\n\n")}`
