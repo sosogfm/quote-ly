@@ -7,6 +7,16 @@ import { Textarea } from "@/components/ui/textarea";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { RiskBadge } from "@/components/evolution/RiskBadge";
 import { StatusBadge } from "@/components/evolution/StatusBadge";
 import { DiffViewer, type PatchFile } from "@/components/evolution/DiffViewer";
@@ -79,6 +89,7 @@ export default function EvolutionProposal() {
   const [acting, setActing] = useState(false);
   const [reason, setReason] = useState("");
   const [approveOpen, setApproveOpen] = useState(false);
+  const [criticalOpen, setCriticalOpen] = useState(false);
 
   const load = useCallback(async () => {
     if (!id) return;
@@ -142,11 +153,12 @@ export default function EvolutionProposal() {
     load();
   };
 
-  const applyToGithub = async () => {
+  const applyToGithub = async (confirmCritical = false) => {
     if (!id) return;
     setActing(true);
+    setCriticalOpen(false);
     const { data, error } = await supabase.functions.invoke("evolution-apply", {
-      body: { taskId: id },
+      body: { taskId: id, confirmCritical },
     });
     setActing(false);
 
@@ -263,8 +275,8 @@ export default function EvolutionProposal() {
           <div className="flex items-start gap-2 rounded-lg border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive">
             <ShieldAlert className="mt-0.5 h-4 w-4 shrink-0" />
             <span>
-              Risco crítico: esta proposta é apenas recomendação manual. A aplicação automática fica
-              bloqueada nesta etapa.
+              Risco crítico: a aplicação só acontece com confirmação explícita e com o limite de risco
+              das configurações do repositório definido como "crítico".
             </span>
           </div>
         )}
@@ -462,8 +474,12 @@ export default function EvolutionProposal() {
             )}
 
             <div className="flex flex-wrap gap-2">
-              {state === "approved" && !task.github_pr_url && risk !== "critical" && (
-                <Button disabled={acting} onClick={applyToGithub}>
+              {state === "approved" && !task.github_pr_url && (
+                <Button
+                  disabled={acting}
+                  variant={risk === "critical" ? "destructive" : "default"}
+                  onClick={() => (risk === "critical" ? setCriticalOpen(true) : applyToGithub())}
+                >
                   {acting ? (
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                   ) : (
@@ -515,6 +531,26 @@ export default function EvolutionProposal() {
           </CardContent>
         </Card>
       </div>
+
+      <AlertDialog open={criticalOpen} onOpenChange={setCriticalOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Aplicar proposta de risco crítico?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Esta proposta foi classificada como risco crítico. A IA vai abrir um Pull Request no
+              GitHub — nada vai para produção sem o seu merge. Confirme que você revisou o diff, os
+              testes e o plano de rollback. O limite de risco nas configurações do repositório precisa
+              estar em "crítico".
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction disabled={acting} onClick={() => applyToGithub(true)}>
+              Confirmo o risco crítico
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       <ApproveDialog
         open={approveOpen}

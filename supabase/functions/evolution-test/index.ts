@@ -14,7 +14,7 @@ const TestRunSchema = z.object({
 
 const TestPlanSchema = z.object({
   summary: z.string().describe("Resumo de uma linha sobre a qualidade do patch"),
-  tests: z.array(TestRunSchema).min(2).max(6),
+  tests: z.array(TestRunSchema).describe("Entre 2 e 6 testes"),
 });
 
 const SYSTEM_PROMPT = `Você é um revisor de código sênior. Você recebe uma proposta de mudança de sistema com arquivos alterados (patches) e deve SIMULAR a execução de testes sobre o patch.
@@ -24,7 +24,7 @@ Para cada teste, verifique estaticamente o patch e decida "passed" ou "failed" c
 - Segurança (RLS, segredos, validação de entrada, exposição de dados).
 - Regressão (o patch quebra comportamento existente aparente?).
 
-Seja honesto: se algo parece quebrado, marque "failed" e explique. Não invente arquivos fora do patch. Responda apenas o JSON pedido.`;
+Seja honesto: se algo parece quebrado, marque "failed" e explique. Gere entre 2 e 6 testes. Não invente arquivos fora do patch. Responda apenas o JSON pedido.`;
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
