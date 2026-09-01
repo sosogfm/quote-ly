@@ -228,15 +228,18 @@ export function getAiProviderInfo(): AiProviderInfo {
   const primary = configs[0];
   const chain = configs.map((c) => c.name);
 
+  const display: Record<AiProviderName, string> = {
+    groq: "Groq",
+    openrouter: "OpenRouter",
+    lovable: "Lovable",
+  };
+
   // Lovable is the paid last resort — only surface it in the label when it's
   // the only configured provider; otherwise show the free chain.
   const freeNames = chain.filter((n) => n !== "lovable");
-  let label: string;
-  if (freeNames.length > 0) {
-    label = `${freeNames.join(" + ")} (grátis)`;
-  } else {
-    label = "Lovable AI (créditos)";
-  }
+  const label = freeNames.length > 0
+    ? `${freeNames.map((n) => display[n]).join(" + ")} (grátis)`
+    : "Lovable AI (créditos)";
 
   return { provider: primary.name, label, model: primary.modelId, chain };
 }
