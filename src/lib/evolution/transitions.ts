@@ -34,6 +34,8 @@ export type ApplyContext = {
   requiresMigration: boolean;
   migrationConfirmedAt: string | null;
   tests: { required: boolean; result: TestResult }[];
+  /** Explicit human override to allow applying a critical-risk proposal. */
+  criticalOverride?: boolean;
 };
 
 /** Server-side gate for "mark as applied". Returns every blocking reason. */
@@ -56,8 +58,8 @@ export function canApply(ctx: ApplyContext): { ok: boolean; reasons: string[] } 
   if (ctx.requiresMigration && !ctx.migrationConfirmedAt) {
     reasons.push("Alteração de banco exige confirmação adicional.");
   }
-  if (ctx.riskLevel === "critical") {
-    reasons.push("Risco crítico: apenas recomendação manual nesta etapa.");
+  if (ctx.riskLevel === "critical" && !ctx.criticalOverride) {
+    reasons.push("Risco crítico: exige confirmação explícita de risco crítico.");
   }
 
   return { ok: reasons.length === 0, reasons };

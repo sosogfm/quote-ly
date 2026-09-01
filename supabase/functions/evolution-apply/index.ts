@@ -70,6 +70,7 @@ Deno.serve(async (req) => {
 
     const body = await req.json().catch(() => null);
     const taskId = typeof body?.taskId === "string" ? body.taskId : "";
+    const confirmCritical = body?.confirmCritical === true;
     if (!taskId) return json({ error: "Proposta não informada." }, 400);
 
     const { data: task } = await supabase
@@ -98,6 +99,7 @@ Deno.serve(async (req) => {
       requiresMigration: !!task.requires_migration,
       migrationConfirmedAt: task.migration_confirmed_at,
       tests: (runs ?? []).map((r) => ({ required: !!r.required, result: r.result as string })),
+      criticalOverride: confirmCritical,
     });
     if (!gate.ok) return json({ error: gate.reasons.join(" "), reasons: gate.reasons }, 409);
 
@@ -115,7 +117,9 @@ Deno.serve(async (req) => {
 
     const maxIdx = RISK_ORDER.indexOf((settings.max_auto_risk ?? "medium") as typeof RISK_ORDER[number]);
     const taskIdx = RISK_ORDER.indexOf((task.risk_level ?? "medium") as typeof RISK_ORDER[number]);
-    if (taskIdx > maxIdx) {
+    const criticalAllowed =
+      task.risk_level === "critical" && confirmCritical && settings.max_auto_risk === "critical";
+    if (taskIdx > maxIdx && !criticalAllowed) {
       return json(
         { error: `Risco "${task.risk_level}" acima do limite permitido ("${settings.max_auto_risk}").` },
         409,
