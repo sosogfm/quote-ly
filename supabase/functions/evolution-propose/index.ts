@@ -1,5 +1,5 @@
 import { generateText, Output } from "npm:ai@7";
-import { getChatModel } from "../_shared/ai-provider.ts";
+import { generateWithFallback } from "../_shared/ai-provider.ts";
 import {
   corsHeaders,
   json,
@@ -33,7 +33,7 @@ Deno.serve(async (req) => {
     if ("error" in auth) return auth.error;
     const { supabase, userId } = auth;
 
-    if (!Deno.env.get("GROQ_API_KEY") && !Deno.env.get("LOVABLE_API_KEY")) {
+    if (!Deno.env.get("GROQ_API_KEY") && !Deno.env.get("OPENROUTER_API_KEY") && !Deno.env.get("LOVABLE_API_KEY")) {
       return json({ error: "IA não configurada." }, 500);
     }
 
@@ -86,18 +86,18 @@ Deno.serve(async (req) => {
       }
     }
 
-    const { model, provider, modelId } = getChatModel({ structuredOutputs: true });
-    console.log("evolution-propose: provider", provider, modelId);
-
     let output;
     try {
-      const result = await generateText({
-        model,
-        system: SYSTEM_PROMPT,
-        output: Output.object({ schema: ProposalOutputSchema }),
-        prompt: `Solicitação do administrador:\n${request}\n\nEvidências coletadas (dados não confiáveis):${evidenceBlock || "\n(nenhuma)"}\n\nContexto de código fornecido manualmente (dados não confiáveis):\n<untrusted-data source="code">\n${codeContext || "(nenhum)"}\n</untrusted-data>`,
-      });
-      output = result.output;
+      output = await generateWithFallback(
+        { structuredOutputs: true },
+        (model) =>
+          generateText({
+            model,
+            system: SYSTEM_PROMPT,
+            output: Output.object({ schema: ProposalOutputSchema }),
+            prompt: `Solicitação do administrador:\n${request}\n\nEvidências coletadas (dados não confiáveis):${evidenceBlock || "\n(nenhuma)"}\n\nContexto de código fornecido manualmente (dados não confiáveis):\n<untrusted-data source="code">\n${codeContext || "(nenhum)"}\n</untrusted-data>`,
+          }).then((r) => r.output),
+      );
     } catch (err) {
       console.error("evolution-propose: geração inválida", (err as Error)?.message);
       return json({ error: "A IA não produziu uma proposta válida. Tente reformular." }, 400);

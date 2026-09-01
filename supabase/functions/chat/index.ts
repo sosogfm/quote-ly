@@ -6,7 +6,7 @@ import {
   tool,
   type UIMessage,
 } from "npm:ai@7";
-import { getChatModel } from "../_shared/ai-provider.ts";
+import { getChatModel, createChainFallbackFetch } from "../_shared/ai-provider.ts";
 import { z } from "npm:zod";
 
 const corsHeaders = {
@@ -173,7 +173,7 @@ Deno.serve(async (req) => {
     }
     const userId = claimsData.claims.sub as string;
 
-    if (!Deno.env.get("GROQ_API_KEY") && !Deno.env.get("LOVABLE_API_KEY")) {
+    if (!Deno.env.get("GROQ_API_KEY") && !Deno.env.get("OPENROUTER_API_KEY") && !Deno.env.get("LOVABLE_API_KEY")) {
       return new Response(JSON.stringify({ error: "IA não configurada." }), {
         status: 500,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -191,8 +191,9 @@ Deno.serve(async (req) => {
     const initialRunId = req.headers.get(LOVABLE_AIG_RUN_ID_HEADER)?.trim() || undefined;
     const runIdFetch = createLovableAiGatewayRunIdFetch(initialRunId);
 
-    const { model, provider, modelId } = getChatModel({ fetch: runIdFetch.fetch as typeof fetch });
-    console.log("chat: using provider", provider, modelId);
+    const chainFetch = createChainFallbackFetch({ fetch: runIdFetch.fetch as typeof fetch });
+    const { model, provider, modelId } = getChatModel({ fetch: chainFetch });
+    console.log("chat: using provider", provider, modelId, "(with fallback chain)");
 
     const projectBlock = projectInstructions
       ? `\n\nProject context and standing instructions from the user:\n${projectInstructions}`

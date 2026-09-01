@@ -2,7 +2,7 @@
 // Called after tests detect problems: the AI rewrites the diffs (or proposes an
 // alternative approach) and the new patches replace the previous ones.
 import { corsHeaders, json, requireAdmin, isForbiddenPath } from "../_shared/evolution.ts";
-import { getChatModel, describeAiError } from "../_shared/ai-provider.ts";
+import { generateWithFallback, describeAiError } from "../_shared/ai-provider.ts";
 import { generateText, Output } from "npm:ai@7";
 import { z } from "npm:zod";
 
@@ -96,14 +96,15 @@ Deno.serve(async (req) => {
 
     let output: z.infer<typeof FixSchema>;
     try {
-      const { model } = getChatModel({ structuredOutputs: true });
-      const result = await generateText({
-        model,
-        output: Output.object({ schema: FixSchema }),
-        temperature: 0.2,
-        system: SYSTEM_PROMPT,
-        prompt: `Proposta: ${task.title}\n\nProblema: ${task.problem ?? "-"}\n\nSolução planejada: ${task.solution ?? "-"}\n\nTestes que FALHARAM:\n${failuresBlock}\n\nPatches atuais:\n\n${filesBlock}`,
-      });
+      const result = await generateWithFallback({ structuredOutputs: true }, (model) =>
+        generateText({
+          model,
+          output: Output.object({ schema: FixSchema }),
+          temperature: 0.2,
+          system: SYSTEM_PROMPT,
+          prompt: `Proposta: ${task.title}\n\nProblema: ${task.problem ?? "-"}\n\nSolução planejada: ${task.solution ?? "-"}\n\nTestes que FALHARAM:\n${failuresBlock}\n\nPatches atuais:\n\n${filesBlock}`,
+        }),
+      );
       output = FixSchema.parse(result.output);
     } catch (err) {
       console.error("evolution-fix IA erro:", (err as Error)?.message);

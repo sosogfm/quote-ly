@@ -1,9 +1,12 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { generateText } from "npm:ai@7";
+import { generateWithFallback, describeAiError } from "../_shared/ai-provider.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
+  "Access-Control-Allow-Headers":
+    "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
 serve(async (req) => {
@@ -21,7 +24,7 @@ serve(async (req) => {
     const supabase = createClient(
       Deno.env.get("SUPABASE_URL")!,
       Deno.env.get("SUPABASE_ANON_KEY")!,
-      { global: { headers: { Authorization: authHeader } } }
+      { global: { headers: { Authorization: authHeader } } },
     );
 
     const token = authHeader.replace("Bearer ", "");
@@ -33,18 +36,12 @@ serve(async (req) => {
     }
 
     const { sectionTitle, sectionContent, templateCategory, proposalTitle } = await req.json();
-    const GROQ_API_KEY = Deno.env.get("GROQ_API_KEY");
-    const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
-    if (!GROQ_API_KEY && !LOVABLE_API_KEY) throw new Error("No AI provider configured");
 
-    // Prefer the user's own free Groq key (Llama), fall back to Lovable AI.
-    const endpoint = GROQ_API_KEY
-      ? "https://api.groq.com/openai/v1/chat/completions"
-      : "https://ai.gateway.lovable.dev/v1/chat/completions";
-    const apiKey = GROQ_API_KEY ?? LOVABLE_API_KEY!;
-    const model = GROQ_API_KEY ? "openai/gpt-oss-120b" : "google/gemini-3-flash-preview";
+    if (!Deno.env.get("GROQ_API_KEY") && !Deno.env.get("OPENROUTER_API_KEY") && !Deno.env.get("LOVABLE_API_KEY")) {
+      throw new Error("No AI provider configured");
+    }
 
-    const systemPrompt = `You are an expert business proposal writer. Your job is to improve proposal section content to be more professional, persuasive, and clear. 
+    const systemPrompt = `You are an expert business proposal writer. Your job is to improve proposal section content to be more professional, persuasive, and clear.
 Keep the same general meaning but make it:
 - More professional and polished
 - More persuasive and client-focused
@@ -56,45 +53,25 @@ Section: "${sectionTitle || "Untitled Section"}"
 
 Return ONLY the improved content text. No explanations, no markdown headers, just the improved section content.`;
 
-    const response = await fetch(endpoint, {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${apiKey}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        model,
-        messages: [
-          { role: "system", content: systemPrompt },
-          { role: "user", content: sectionContent || "Write initial content for this section." },
-        ],
-      }),
-    });
+    try {
+      const { text } = await generateWithFallback({}, (model) =>
+        generateText({
+          model,
+          system: systemPrompt,
+          prompt: sectionContent || "Write initial content for this section.",
+        }),
+      );
 
-    if (!response.ok) {
-      if (response.status === 429) {
-        return new Response(JSON.stringify({ error: "Rate limit exceeded. Please try again in a moment." }), {
-          status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
-      }
-      if (response.status === 402) {
-        return new Response(JSON.stringify({ error: "AI credits exhausted. Please add credits in Settings → Workspace → Usage." }), {
-          status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
-      }
-      const t = await response.text();
-      console.error("AI gateway error:", response.status, t);
-      return new Response(JSON.stringify({ error: "AI service error" }), {
-        status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      return new Response(JSON.stringify({ content: text }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    } catch (err) {
+      const { message, status } = describeAiError(err);
+      console.error("ai-content error:", (err as Error)?.message);
+      return new Response(JSON.stringify({ error: message }), {
+        status, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
-
-    const data = await response.json();
-    const improved = data.choices?.[0]?.message?.content ?? "";
-
-    return new Response(JSON.stringify({ content: improved }), {
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
-    });
   } catch (e) {
     console.error("ai-content error:", e);
     return new Response(JSON.stringify({ error: e instanceof Error ? e.message : "Unknown error" }), {
