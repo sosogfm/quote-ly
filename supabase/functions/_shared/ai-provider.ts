@@ -15,8 +15,8 @@ export interface AiProviderInfo {
 export const GROQ_CHAT_MODEL = "openai/gpt-oss-120b";
 export const GROQ_FAST_MODEL = "openai/gpt-oss-20b";
 // OpenRouter free variants (globally accessible, no card, work in Brazil).
-export const OPENROUTER_CHAT_MODEL = "meta-llama/llama-3.3-70b-instruct:free";
-export const OPENROUTER_FAST_MODEL = "meta-llama/llama-3.1-8b-instruct:free";
+export const OPENROUTER_CHAT_MODEL = "minimax/minimax-m3:free";
+export const OPENROUTER_FAST_MODEL = "minimax/minimax-m3:free";
 const LOVABLE_CHAT_MODEL = "google/gemini-3.7-flash";
 
 export interface ChainEntry {
