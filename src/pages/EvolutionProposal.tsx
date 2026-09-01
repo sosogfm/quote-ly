@@ -36,6 +36,7 @@ import {
   RotateCcw,
   ShieldAlert,
   Undo2,
+  Wrench,
 } from "lucide-react";
 
 type TaskRow = {
@@ -90,6 +91,7 @@ export default function EvolutionProposal() {
   const [reason, setReason] = useState("");
   const [approveOpen, setApproveOpen] = useState(false);
   const [criticalOpen, setCriticalOpen] = useState(false);
+  const [fixing, setFixing] = useState(false);
 
   const load = useCallback(async () => {
     if (!id) return;
@@ -396,7 +398,11 @@ export default function EvolutionProposal() {
 
           <TabsContent value="tests" className="space-y-3 pt-4">
             <div className="flex flex-wrap items-center gap-2">
-              <Button size="sm" disabled={acting || files.length === 0} onClick={runAiTests}>
+              <Button
+                size="sm"
+                disabled={acting || fixing || files.length === 0}
+                onClick={() => runAiTests()}
+              >
                 {acting ? (
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                 ) : (
@@ -404,9 +410,23 @@ export default function EvolutionProposal() {
                 )}
                 Rodar testes
               </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                disabled={acting || fixing || !tests.some((t) => t.result === "failed")}
+                onClick={() => autoFix()}
+              >
+                {fixing ? (
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                ) : (
+                  <Wrench className="mr-2 h-4 w-4" />
+                )}
+                Corrigir com IA
+              </Button>
               <span className="text-xs text-muted-foreground">
                 Com Pull Request aberto, busca o resultado real do CI (lint, tipos, testes, build).
-                Sem PR, faz revisão estática determinística do diff.
+                Sem PR, faz revisão estática determinística do diff. Se algum teste falhar, a IA
+                corrige os patches (ou muda a abordagem) e roda os testes de novo automaticamente.
               </span>
 
             </div>
