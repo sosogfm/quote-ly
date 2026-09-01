@@ -88,7 +88,13 @@ interface ProviderConfig {
   supportsStructuredOutputs: boolean;
 }
 
-async function providerConfigs(fast: boolean): Promise<ProviderConfig[]> {
+/** Providers whose configured models cannot read images (text-only). */
+const NON_VISION_PROVIDERS: AiProviderName[] = ["groq"];
+
+async function providerConfigs(
+  fast: boolean,
+  exclude: AiProviderName[] = [],
+): Promise<ProviderConfig[]> {
   const settings = await loadAiSettings();
   const byName = new Map<AiProviderName, ProviderConfig>();
 
@@ -154,7 +160,7 @@ async function providerConfigs(fast: boolean): Promise<ProviderConfig[]> {
   }
   // Anything configured but not listed in the order goes last.
   for (const c of byName.values()) configs.push(c);
-  return configs;
+  return configs.filter((c) => !exclude.includes(c.name));
 }
 
 /**
@@ -165,10 +171,15 @@ export async function getProviderChain(options?: {
   fast?: boolean;
   structuredOutputs?: boolean;
   fetch?: typeof fetch;
+  /** Set when the request carries images: text-only providers are skipped. */
+  requireVision?: boolean;
 }): Promise<ChainEntry[]> {
   const fast = options?.fast ?? false;
   const wantStructured = options?.structuredOutputs ?? false;
-  const configs = await providerConfigs(fast);
+  const configs = await providerConfigs(
+    fast,
+    options?.requireVision ? NON_VISION_PROVIDERS : [],
+  );
 
   const chain: ChainEntry[] = [];
   for (const c of configs) {
@@ -202,6 +213,7 @@ export async function getChatModel(options?: {
   fast?: boolean;
   structuredOutputs?: boolean;
   fetch?: typeof fetch;
+  requireVision?: boolean;
 }) {
   const chain = await getProviderChain(options);
   const primary = chain[0];
@@ -256,10 +268,13 @@ function isFallbackableError(err: unknown): boolean {
  * transparent without touching the stream serialization.
  */
 export async function createChainFallbackFetch(
-  options?: { fast?: boolean; fetch?: typeof fetch },
+  options?: { fast?: boolean; fetch?: typeof fetch; requireVision?: boolean },
 ): Promise<typeof fetch> {
   const innerFetch = options?.fetch ?? fetch;
-  const configs = await providerConfigs(options?.fast ?? false);
+  const configs = await providerConfigs(
+    options?.fast ?? false,
+    options?.requireVision ? NON_VISION_PROVIDERS : [],
+  );
   // Fallback targets = everything after the primary.
   const fallbacks = configs.slice(1);
 
