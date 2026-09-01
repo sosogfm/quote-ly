@@ -19,6 +19,8 @@ import { toast } from "sonner";
 import {
   ArrowLeft,
   Database,
+  FlaskConical,
+
   Loader2,
   Github,
   RotateCcw,
@@ -170,6 +172,39 @@ export default function EvolutionProposal() {
     load();
   };
 
+  const runAiTests = async () => {
+    if (!id) return;
+    setActing(true);
+    const { data, error } = await supabase.functions.invoke("evolution-test", {
+      body: { taskId: id },
+    });
+    setActing(false);
+
+    if (error) {
+      let message = "Não foi possível rodar os testes automáticos.";
+      try {
+        const ctx = (error as { context?: Response }).context;
+        if (ctx) {
+          const parsed = await ctx.json();
+          if (parsed?.error) message = String(parsed.error);
+        }
+      } catch {
+        /* keeps the generic message */
+      }
+      toast.error(message);
+      return;
+    }
+    if (data && typeof data === "object" && "error" in data) {
+      toast.error(String((data as { error: string }).error));
+      return;
+    }
+    const failed = (data as { failed?: number })?.failed ?? 0;
+    toast[failed > 0 ? "warning" : "success"](
+      failed > 0 ? `Testes concluídos: ${failed} falharam.` : "Todos os testes passaram.",
+    );
+    load();
+  };
+
 
   if (loading) {
     return (
@@ -298,9 +333,23 @@ export default function EvolutionProposal() {
           </TabsContent>
 
           <TabsContent value="tests" className="space-y-3 pt-4">
+            <div className="flex flex-wrap items-center gap-2">
+              <Button size="sm" disabled={acting || files.length === 0} onClick={runAiTests}>
+                {acting ? (
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                ) : (
+                  <FlaskConical className="mr-2 h-4 w-4" />
+                )}
+                Rodar testes com IA
+              </Button>
+              <span className="text-xs text-muted-foreground">
+                Análise estática do diff feita pela IA (não executa o código).
+              </span>
+            </div>
             {tests.length === 0 ? (
               <p className="text-sm text-muted-foreground">Nenhum teste definido nesta proposta.</p>
             ) : (
+
               tests.map((t) => (
                 <Card key={t.id}>
                   <CardContent className="space-y-2 p-4">
