@@ -1,7 +1,7 @@
 import { corsHeaders, json, requireAdmin } from "../_shared/evolution.ts";
 import { getChatModel, describeAiError } from "../_shared/ai-provider.ts";
-import { generateText, Output } from "npm:ai@5";
-import { z } from "npm:zod@3.25.76";
+import { generateText, Output } from "npm:ai@7";
+import { z } from "npm:zod";
 
 const TestRunSchema = z.object({
   name: z.string().describe("Nome curto do teste"),
@@ -14,7 +14,7 @@ const TestRunSchema = z.object({
 
 const TestPlanSchema = z.object({
   summary: z.string().describe("Resumo de uma linha sobre a qualidade do patch"),
-  tests: z.array(TestRunSchema).min(2).max(6),
+  tests: z.array(TestRunSchema).describe("Entre 2 e 6 testes"),
 });
 
 const SYSTEM_PROMPT = `Você é um revisor de código sênior. Você recebe uma proposta de mudança de sistema com arquivos alterados (patches) e deve SIMULAR a execução de testes sobre o patch.
@@ -24,7 +24,7 @@ Para cada teste, verifique estaticamente o patch e decida "passed" ou "failed" c
 - Segurança (RLS, segredos, validação de entrada, exposição de dados).
 - Regressão (o patch quebra comportamento existente aparente?).
 
-Seja honesto: se algo parece quebrado, marque "failed" e explique. Não invente arquivos fora do patch. Responda apenas o JSON pedido.`;
+Seja honesto: se algo parece quebrado, marque "failed" e explique. Gere entre 2 e 6 testes. Não invente arquivos fora do patch. Responda apenas o JSON pedido.`;
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
@@ -70,15 +70,16 @@ Deno.serve(async (req) => {
 
     let output: z.infer<typeof TestPlanSchema>;
     try {
-      const { model } = getChatModel({ structuredOutputs: false });
+      const { model } = getChatModel({ structuredOutputs: true });
       const result = await generateText({
         model,
         output: Output.object({ schema: TestPlanSchema }),
         system: SYSTEM_PROMPT,
         prompt: `Proposta: ${task.title}\n\nProblema: ${task.problem ?? "-"}\n\nSolução: ${task.solution ?? "-"}\n\nArquivos alterados:\n\n${filesBlock}`,
       });
-      output = result.output;
+      output = TestPlanSchema.parse(result.output);
     } catch (err) {
+      console.error("evolution-test IA erro:", (err as Error)?.message);
       const { message, status } = describeAiError(err);
       return json({ error: message }, status);
     }
