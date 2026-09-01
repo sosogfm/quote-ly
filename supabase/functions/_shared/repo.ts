@@ -108,17 +108,18 @@ export async function searchRepo(
 
   const needle = query.toLowerCase();
   const hits: { path: string; line: number; text: string }[] = [];
-  for (const path of candidates) {
-    if (hits.length >= 40) break;
-    try {
-      const { content } = await readRepoFile(ref, path);
-      content.split("\n").forEach((line, i) => {
+  for (let i = 0; i < candidates.length && hits.length < 40; i += 12) {
+    const batch = candidates.slice(i, i + 12);
+    const files = await Promise.all(
+      batch.map((path) => readRepoFile(ref, path).catch(() => null)),
+    );
+    for (const file of files) {
+      if (!file) continue;
+      file.content.split("\n").forEach((line, idx) => {
         if (hits.length < 40 && line.toLowerCase().includes(needle)) {
-          hits.push({ path, line: i + 1, text: line.trim().slice(0, 200) });
+          hits.push({ path: file.path, line: idx + 1, text: line.trim().slice(0, 200) });
         }
       });
-    } catch {
-      // unreadable file — skip
     }
   }
   return hits;
