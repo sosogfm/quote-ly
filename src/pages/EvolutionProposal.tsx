@@ -184,16 +184,10 @@ export default function EvolutionProposal() {
     load();
   };
 
-  const runAiTests = async () => {
-    if (!id) return;
-    setActing(true);
-    const { data, error } = await supabase.functions.invoke("evolution-test", {
-      body: { taskId: id },
-    });
-    setActing(false);
-
+  const invokeFn = async (name: string, fallbackMessage: string) => {
+    const { data, error } = await supabase.functions.invoke(name, { body: { taskId: id } });
     if (error) {
-      let message = "Não foi possível rodar os testes automáticos.";
+      let message = fallbackMessage;
       try {
         const ctx = (error as { context?: Response }).context;
         if (ctx) {
@@ -203,33 +197,75 @@ export default function EvolutionProposal() {
       } catch {
         /* keeps the generic message */
       }
-      toast.error(message);
-      return;
+      return { error: message };
     }
     if (data && typeof data === "object" && "error" in data) {
-      toast.error(String((data as { error: string }).error));
+      return { error: String((data as { error: string }).error) };
+    }
+    return { data: (data ?? {}) as Record<string, unknown> };
+  };
+
+  const autoFix = async (options?: { silentWhenNothingToFix?: boolean }) => {
+    if (!id) return false;
+    setFixing(true);
+    const res = await invokeFn("evolution-fix", "Não foi possível corrigir a proposta com a IA.");
+    setFixing(false);
+
+    if (res.error) {
+      if (!options?.silentWhenNothingToFix || !/nada para corrigir/i.test(res.error)) {
+        toast.error(res.error);
+      }
+      return false;
+    }
+    const out = res.data as { summary?: string; notes?: string; approach_changed?: boolean };
+    toast.success(
+      out.approach_changed
+        ? `Abordagem alterada: ${out.summary ?? "patches refeitos pela IA."}`
+        : `Correção aplicada aos patches: ${out.summary ?? "patches atualizados."}`,
+      { description: out.notes?.slice(0, 200) },
+    );
+    await load();
+    return true;
+  };
+
+  const runAiTests = async (options?: { autoFix?: boolean }) => {
+    if (!id) return;
+    setActing(true);
+    const res = await invokeFn("evolution-test", "Não foi possível rodar os testes automáticos.");
+    setActing(false);
+
+    if (res.error) {
+      toast.error(res.error);
       return;
     }
-    const res = (data ?? {}) as {
+    const out = res.data as {
       failed?: number;
       pending?: number;
       mode?: string;
       summary?: string;
     };
-    const failed = res.failed ?? 0;
-    const pending = res.pending ?? 0;
-    const prefix = res.mode === "real" ? "CI real" : "Revisão estática";
+    const failed = out.failed ?? 0;
+    const pending = out.pending ?? 0;
+    const prefix = out.mode === "real" ? "CI real" : "Revisão estática";
     if (pending > 0) {
-      toast.info(res.summary ?? `${prefix}: testes ainda em andamento.`);
+      toast.info(out.summary ?? `${prefix}: testes ainda em andamento.`);
     } else {
       toast[failed > 0 ? "warning" : "success"](
-        res.summary ??
+        out.summary ??
           (failed > 0 ? `${prefix}: ${failed} falharam.` : `${prefix}: todos passaram.`),
       );
     }
 
-    load();
+    await load();
+
+    // Auto-correction loop: failures found -> AI rewrites the patches, then re-tests once.
+    if (failed > 0 && pending === 0 && options?.autoFix !== false) {
+      toast.info("Falhas detectadas — a IA está corrigindo os patches...");
+      const fixed = await autoFix({ silentWhenNothingToFix: true });
+      if (fixed) await runAiTests({ autoFix: false });
+    }
   };
+
 
 
   if (loading) {
