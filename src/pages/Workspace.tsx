@@ -24,15 +24,21 @@ import {
 import {
   PromptInput,
   PromptInputBody,
+  PromptInputButton,
   PromptInputFooter,
   PromptInputSubmit,
   PromptInputTextarea,
   PromptInputTools,
+  usePromptInputAttachments,
   type PromptInputMessage,
 } from "@/components/ai-elements/prompt-input";
 import { Shimmer } from "@/components/ai-elements/shimmer";
 import { AiProviderSelect } from "@/components/AiProviderSelect";
-import { Sparkles } from "lucide-react";
+import { ArtifactsPanel } from "@/components/workspace/ArtifactsPanel";
+import { extractFileText, isImage } from "@/lib/fileExtract";
+import type { ArtifactLike } from "@/lib/artifactDownload";
+import { Button } from "@/components/ui/button";
+import { Paperclip, PanelRight, Sparkles, X } from "lucide-react";
 
 const CHAT_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/chat`;
 const AI_STATUS_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/ai-status`;
@@ -55,11 +61,18 @@ export default function Workspace() {
   const [initialMessages, setInitialMessages] = useState<UIMessage[]>([]);
   const [loadingThread, setLoadingThread] = useState(false);
   const [aiLabel, setAiLabel] = useState<string | null>(null);
+  const [aiModel, setAiModel] = useState<string | null>(null);
+  const [artifacts, setArtifacts] = useState<ArtifactLike[]>([]);
+  const [panelOpen, setPanelOpen] = useState(false);
   const threadIdRef = useRef<string | null>(threadId ?? null);
   const savedIds = useRef<Set<string>>(new Set());
   // Thread we just created client-side: its messages live in memory already,
   // so the route change must not trigger a (re)load that would wipe them.
   const skipLoadRef = useRef<string | null>(null);
+  // Raw File objects picked in the composer (mirrored by attachedNames for UI).
+  const pendingFiles = useRef<File[]>([]);
+  const [attachedNames, setAttachedNames] = useState<string[]>([]);
+  const [extracting, setExtracting] = useState(false);
 
   // Only adopt the route param when it names a thread; when the URL is
   // /workspace (no param) keep the thread created during this session,
@@ -102,9 +115,30 @@ export default function Workspace() {
   useEffect(() => {
     fetch(AI_STATUS_URL)
       .then((r) => (r.ok ? r.json() : null))
-      .then((d) => setAiLabel(d?.label ?? null))
+      .then((d) => {
+        setAiLabel(d?.label ?? null);
+        setAiModel(d?.model ?? null);
+      })
       .catch(() => setAiLabel(null));
   }, []);
+
+  // Files the assistant generated for this conversation
+  const loadArtifacts = useCallback(async () => {
+    if (!user || !threadId) {
+      setArtifacts([]);
+      return;
+    }
+    const { data } = await supabase
+      .from("artifacts")
+      .select("id, title, kind, language, content")
+      .eq("thread_id", threadId)
+      .order("created_at", { ascending: false });
+    setArtifacts((data ?? []) as ArtifactLike[]);
+  }, [user, threadId]);
+
+  useEffect(() => {
+    loadArtifacts();
+  }, [loadArtifacts]);
 
   // Load messages for the active thread
   useEffect(() => {
@@ -169,12 +203,14 @@ export default function Workspace() {
         .update({ updated_at: new Date().toISOString() })
         .eq("id", tid);
       loadSidebar();
+      loadArtifacts();
     })();
-  }, [messages, status, user, loadSidebar]);
+  }, [messages, status, user, loadSidebar, loadArtifacts]);
 
   const handleSubmit = async (message: PromptInputMessage) => {
     const text = message.text?.trim();
-    if (!text || !user) return;
+    const attached = pendingFiles.current;
+    if ((!text && attached.length === 0) || !user) return;
 
     let tid = threadIdRef.current;
     if (!tid) {
@@ -198,7 +234,28 @@ export default function Workspace() {
 
     }
 
-    sendMessage({ text });
+    // Images go to the model as image parts; documents are extracted to text
+    // on the client so text-only providers can read them too.
+    const images = attached.filter(isImage);
+    const docs = attached.filter((f) => !isImage(f));
+    let prompt = text ?? "";
+    if (docs.length > 0) {
+      setExtracting(true);
+      try {
+        const blocks = await Promise.all(docs.map((f) => extractFileText(f)));
+        prompt = `${prompt}\n\n${blocks.join("\n\n")}`.trim();
+      } finally {
+        setExtracting(false);
+      }
+    }
+
+    pendingFiles.current = [];
+    setAttachedNames([]);
+    sendMessage(
+      images.length > 0
+        ? { text: prompt, files: images }
+        : { text: prompt },
+    );
   };
 
   useEffect(() => {
