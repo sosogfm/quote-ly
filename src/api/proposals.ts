@@ -15,7 +15,7 @@ export interface Proposal {
  */
 export async function getProposals(limit: number, offset: number) {
   const { data, error, count } = await supabase
-    .from<Proposal>('proposals')
+    .from('proposals')
     .select('*', { count: 'exact' })
     .order('created_at', { ascending: false })
     .range(offset, offset + limit - 1);
