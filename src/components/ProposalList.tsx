@@ -24,8 +24,8 @@ export default function ProposalList() {
 
   useEffect(() => {
     loadPage(page);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [page]);
+
 
   const handleLoadMore = () => {
     if (hasMore && !loading) {
