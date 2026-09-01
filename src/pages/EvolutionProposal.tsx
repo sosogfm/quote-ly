@@ -91,6 +91,7 @@ export default function EvolutionProposal() {
   const [reason, setReason] = useState("");
   const [approveOpen, setApproveOpen] = useState(false);
   const [criticalOpen, setCriticalOpen] = useState(false);
+  const [markCriticalOpen, setMarkCriticalOpen] = useState(false);
   const [fixing, setFixing] = useState(false);
 
   const load = useCallback(async () => {
@@ -619,6 +620,30 @@ export default function EvolutionProposal() {
           </CardContent>
         </Card>
       </div>
+
+      <AlertDialog open={markCriticalOpen} onOpenChange={setMarkCriticalOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Marcar proposta de risco crítico como aplicada?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Esta proposta é de risco crítico. Confirme que a mudança já está de fato no código
+              (merge feito) e que você revisou o diff, os testes e o plano de rollback.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              disabled={acting}
+              onClick={() => {
+                setMarkCriticalOpen(false);
+                runAction("mark_applied", { confirmCritical: true });
+              }}
+            >
+              Confirmar risco crítico
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       <AlertDialog open={criticalOpen} onOpenChange={setCriticalOpen}>
         <AlertDialogContent>
