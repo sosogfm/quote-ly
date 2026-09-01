@@ -331,9 +331,23 @@ export default function EvolutionProposal() {
           </TabsContent>
 
           <TabsContent value="tests" className="space-y-3 pt-4">
+            <div className="flex flex-wrap items-center gap-2">
+              <Button size="sm" disabled={acting || files.length === 0} onClick={runAiTests}>
+                {acting ? (
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                ) : (
+                  <FlaskConical className="mr-2 h-4 w-4" />
+                )}
+                Rodar testes com IA
+              </Button>
+              <span className="text-xs text-muted-foreground">
+                Análise estática do diff feita pela IA (não executa o código).
+              </span>
+            </div>
             {tests.length === 0 ? (
               <p className="text-sm text-muted-foreground">Nenhum teste definido nesta proposta.</p>
             ) : (
+
               tests.map((t) => (
                 <Card key={t.id}>
                   <CardContent className="space-y-2 p-4">
