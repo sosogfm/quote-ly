@@ -7,10 +7,10 @@
 - [x] BYOK Groq (GPT-OSS 120b/20b) with Lovable fallback + provider badge
 - [x] Fix reasoning_content error (strip reasoning parts before model conversion)
 - [x] Wire /evolution routes + sidebar menu item
+- [x] IA roda testes das propostas automaticamente (evolution-test + botão "Rodar testes com IA")
 - [x] Auto-apply via GitHub: evolution-apply deployed, repo settings UI, "Aplicar via GitHub" button + PR link
 
 ## Pending (future phases)
-- [ ] IA executa os testes das propostas automaticamente (sem marcação manual)
 - [ ] Phase 3: RAG + file/photo uploads (multimodal in chat)
 - [ ] Phase 4: Tools (PDF export, code execution, image generation)
 - [ ] Phase 5: Site Maker (Lovable-style live preview)
