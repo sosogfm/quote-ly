@@ -8,6 +8,7 @@ import {
 import { NewProposalDialog } from "@/components/evolution/NewProposalDialog";
 import { ProposalCard, type ProposalRow } from "@/components/evolution/ProposalCard";
 import { RepoSettingsCard } from "@/components/evolution/RepoSettingsCard";
+import { AiModelSettingsCard } from "@/components/evolution/AiModelSettingsCard";
 import { supabase } from "@/integrations/supabase/client";
 import { STATE_LABELS, RISK_LABELS, type ProposalState, type RiskLevel } from "@/lib/evolution/types";
 import { Loader2, Search, ShieldCheck } from "lucide-react";
@@ -69,6 +70,8 @@ export default function Evolution() {
         </div>
 
         <RepoSettingsCard />
+
+        <AiModelSettingsCard />
 
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
           {[

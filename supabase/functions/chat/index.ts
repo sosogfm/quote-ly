@@ -191,8 +191,8 @@ Deno.serve(async (req) => {
     const initialRunId = req.headers.get(LOVABLE_AIG_RUN_ID_HEADER)?.trim() || undefined;
     const runIdFetch = createLovableAiGatewayRunIdFetch(initialRunId);
 
-    const chainFetch = createChainFallbackFetch({ fetch: runIdFetch.fetch as typeof fetch });
-    const { model, provider, modelId } = getChatModel({ fetch: chainFetch });
+    const chainFetch = await createChainFallbackFetch({ fetch: runIdFetch.fetch as typeof fetch });
+    const { model, provider, modelId } = await getChatModel({ fetch: chainFetch });
     console.log("chat: using provider", provider, modelId, "(with fallback chain)");
 
     const projectBlock = projectInstructions

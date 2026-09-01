@@ -117,6 +117,7 @@ Deno.serve(async (req) => {
         requiresMigration: !!task.requires_migration,
         migrationConfirmedAt: task.migration_confirmed_at,
         tests: (runs ?? []).map((r) => ({ required: !!r.required, result: r.result as string })),
+        criticalOverride: body?.confirmCritical === true,
       });
       if (!gate.ok) return json({ error: gate.reasons.join(" ") , reasons: gate.reasons }, 409);
     }

@@ -91,6 +91,7 @@ export default function EvolutionProposal() {
   const [reason, setReason] = useState("");
   const [approveOpen, setApproveOpen] = useState(false);
   const [criticalOpen, setCriticalOpen] = useState(false);
+  const [markCriticalOpen, setMarkCriticalOpen] = useState(false);
   const [fixing, setFixing] = useState(false);
 
   const load = useCallback(async () => {
@@ -142,7 +143,19 @@ export default function EvolutionProposal() {
     setActing(false);
 
     if (error) {
-      toast.error("Não foi possível concluir a ação.");
+      // Non-2xx responses (e.g. 409 gate blocks) arrive as FunctionsHttpError —
+      // read the JSON body so the real reason is shown instead of a generic toast.
+      let message = "Não foi possível concluir a ação.";
+      try {
+        const ctx = (error as { context?: Response }).context;
+        if (ctx) {
+          const parsed = await ctx.json();
+          if (parsed?.error) message = String(parsed.error);
+        }
+      } catch {
+        /* keeps the generic message */
+      }
+      toast.error(message);
       return;
     }
     if (data && typeof data === "object" && "error" in data) {
@@ -584,7 +597,11 @@ export default function EvolutionProposal() {
                 <Button
                   variant="secondary"
                   disabled={acting}
-                  onClick={() => runAction("mark_applied")}
+                  onClick={() =>
+                    task?.risk_level === "critical"
+                      ? setMarkCriticalOpen(true)
+                      : runAction("mark_applied")
+                  }
                 >
                   Marcar como aplicada
                 </Button>
@@ -603,6 +620,30 @@ export default function EvolutionProposal() {
           </CardContent>
         </Card>
       </div>
+
+      <AlertDialog open={markCriticalOpen} onOpenChange={setMarkCriticalOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Marcar proposta de risco crítico como aplicada?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Esta proposta é de risco crítico. Confirme que a mudança já está de fato no código
+              (merge feito) e que você revisou o diff, os testes e o plano de rollback.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              disabled={acting}
+              onClick={() => {
+                setMarkCriticalOpen(false);
+                runAction("mark_applied", { confirmCritical: true });
+              }}
+            >
+              Confirmar risco crítico
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       <AlertDialog open={criticalOpen} onOpenChange={setCriticalOpen}>
         <AlertDialogContent>
