@@ -14,6 +14,60 @@ export type Database = {
   }
   public: {
     Tables: {
+      ai_settings: {
+        Row: {
+          custom_base_url: string | null
+          custom_chat_model: string | null
+          custom_enabled: boolean
+          custom_fast_model: string | null
+          custom_label: string
+          custom_supports_structured: boolean
+          groq_chat_model: string
+          groq_fast_model: string
+          id: string
+          lovable_chat_model: string
+          openrouter_chat_model: string
+          openrouter_fast_model: string
+          provider_order: string[]
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          custom_base_url?: string | null
+          custom_chat_model?: string | null
+          custom_enabled?: boolean
+          custom_fast_model?: string | null
+          custom_label?: string
+          custom_supports_structured?: boolean
+          groq_chat_model?: string
+          groq_fast_model?: string
+          id?: string
+          lovable_chat_model?: string
+          openrouter_chat_model?: string
+          openrouter_fast_model?: string
+          provider_order?: string[]
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          custom_base_url?: string | null
+          custom_chat_model?: string | null
+          custom_enabled?: boolean
+          custom_fast_model?: string | null
+          custom_label?: string
+          custom_supports_structured?: boolean
+          groq_chat_model?: string
+          groq_fast_model?: string
+          id?: string
+          lovable_chat_model?: string
+          openrouter_chat_model?: string
+          openrouter_fast_model?: string
+          provider_order?: string[]
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: []
+      }
       artifacts: {
         Row: {
           content: string | null
