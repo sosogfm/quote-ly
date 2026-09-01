@@ -140,6 +140,37 @@ export default function EvolutionProposal() {
     load();
   };
 
+  const applyToGithub = async () => {
+    if (!id) return;
+    setActing(true);
+    const { data, error } = await supabase.functions.invoke("evolution-apply", {
+      body: { taskId: id },
+    });
+    setActing(false);
+
+    if (error) {
+      let message = "Não foi possível abrir o Pull Request.";
+      try {
+        const ctx = (error as { context?: Response }).context;
+        if (ctx) {
+          const parsed = await ctx.json();
+          if (parsed?.error) message = String(parsed.error);
+        }
+      } catch {
+        /* keeps the generic message */
+      }
+      toast.error(message);
+      return;
+    }
+    if (data && typeof data === "object" && "error" in data) {
+      toast.error(String((data as { error: string }).error));
+      return;
+    }
+    toast.success("Pull Request aberto no GitHub.");
+    load();
+  };
+
+
   if (loading) {
     return (
       <DashboardLayout>
