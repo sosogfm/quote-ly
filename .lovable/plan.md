@@ -38,6 +38,8 @@ Migrar para `generateWithFallback`:
 - `evolution-apply` → `resolveContent` (uma chamada de IA por arquivo; com fallback, se a Groq rate-limitar no meio, o próximo arquivo usa Gemini sem abortar o PR todo)
 - `ai-content` (melhoria de seção de proposta)
 
+> Por que o PR dispara o limite: `evolution-apply` chama a IA **uma vez por arquivo** para converter o patch no conteúdo final antes de commitar. Vários arquivos = várias chamadas seguidas = a Groq gratuita barra com 429 e o PR nem abre. O fallback resolve isso (Groq → Gemini). Além disso, vou **batchear** a resolução de conteúdo: quando vários arquivos precisam de IA, fazer **uma única chamada** que devolve todos os arquivos de uma vez (em vez de N chamadas), reduzindo drasticamente o número de requisições e a chance de qualquer limite ser atingido.
+
 ### 5. Indicador na interface
 - `ai-status` reporta cadeia ativa.
 - Selo no workspace: "IA: Groq + Gemini (grátis)" quando ambos configurados; "IA: Groq (grátis)" se só Groq; "IA: Lovable (créditos)" se só Lovable.
