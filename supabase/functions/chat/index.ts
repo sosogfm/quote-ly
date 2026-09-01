@@ -232,8 +232,24 @@ Deno.serve(async (req) => {
     const initialRunId = req.headers.get(LOVABLE_AIG_RUN_ID_HEADER)?.trim() || undefined;
     const runIdFetch = createLovableAiGatewayRunIdFetch(initialRunId);
 
-    const chainFetch = await createChainFallbackFetch({ fetch: runIdFetch.fetch as typeof fetch });
-    const { model, provider, modelId } = await getChatModel({ fetch: chainFetch });
+    // Images require a multimodal provider; text-only providers are skipped.
+    const hasImage = messages.some((m) =>
+      Array.isArray(m.parts) &&
+      m.parts.some(
+        (p) =>
+          (p as { type?: string; mediaType?: string }).type === "file" &&
+          ((p as { mediaType?: string }).mediaType ?? "").startsWith("image/"),
+      )
+    );
+
+    const chainFetch = await createChainFallbackFetch({
+      fetch: runIdFetch.fetch as typeof fetch,
+      requireVision: hasImage,
+    });
+    const { model, provider, modelId } = await getChatModel({
+      fetch: chainFetch,
+      requireVision: hasImage,
+    });
     console.log("chat: using provider", provider, modelId, "(with fallback chain)");
 
     const projectBlock = projectInstructions
@@ -248,7 +264,15 @@ Deno.serve(async (req) => {
     const strippedMessages = messages.map((m) => ({
       ...m,
       parts: Array.isArray(m.parts)
-        ? m.parts.filter((p) => p.type !== "reasoning")
+        ? m.parts.filter((p) => {
+            if (p.type === "reasoning") return false;
+            // Non-image attachments are extracted to text on the client;
+            // forwarding their raw bytes breaks the free providers.
+            if (p.type === "file") {
+              return ((p as { mediaType?: string }).mediaType ?? "").startsWith("image/");
+            }
+            return true;
+          })
         : m.parts,
     }));
 
@@ -280,6 +304,110 @@ Deno.serve(async (req) => {
       abortSignal: req.signal,
       stopWhen: stepCountIs(4),
       tools: {
+        list_project_files: tool({
+          description:
+            "Lista os caminhos dos arquivos do código-fonte deste próprio sistema (repositório do projeto). Use antes de ler arquivos para descobrir os caminhos reais.",
+          inputSchema: z.object({
+            filter: z
+              .string()
+              .max(120)
+              .nullable()
+              .describe("Filtro de substring no caminho, ex.: 'supabase/functions' ou '.tsx'. Use null para listar tudo."),
+          }),
+          execute: async ({ filter }) => {
+            const ref = await loadRepoRef();
+            if (!ref || !repoAvailable()) {
+              return { ok: false, error: "Repositório do projeto não configurado na Central de Evolução." };
+            }
+            try {
+              const all = await listRepoFiles(ref);
+              const f = (filter ?? "").trim().toLowerCase();
+              const paths = (f ? all.filter((p) => p.toLowerCase().includes(f)) : all).slice(0, 400);
+              return { ok: true, repo: `${ref.owner}/${ref.repo}@${ref.branch}`, count: paths.length, paths };
+            } catch (e) {
+              return { ok: false, error: e instanceof Error ? e.message : "Falha ao listar arquivos." };
+            }
+          },
+        }),
+        read_project_file: tool({
+          description:
+            "Lê o conteúdo de um arquivo do código-fonte deste sistema. Caminho relativo à raiz do repositório.",
+          inputSchema: z.object({
+            path: z.string().min(1).max(300).describe("Ex.: src/pages/Workspace.tsx"),
+          }),
+          execute: async ({ path }) => {
+            const ref = await loadRepoRef();
+            if (!ref || !repoAvailable()) {
+              return { ok: false, error: "Repositório do projeto não configurado na Central de Evolução." };
+            }
+            try {
+              const file = await readRepoFile(ref, path);
+              return { ok: true, ...file };
+            } catch (e) {
+              return { ok: false, error: e instanceof Error ? e.message : "Falha ao ler o arquivo." };
+            }
+          },
+        }),
+        search_project_code: tool({
+          description:
+            "Busca um texto no código-fonte deste sistema e devolve os trechos com arquivo e linha.",
+          inputSchema: z.object({
+            query: z.string().min(2).max(120).describe("Texto literal a procurar."),
+            pathGlob: z
+              .string()
+              .max(120)
+              .nullable()
+              .describe("Glob opcional para limitar a busca, ex.: 'src/**' ou 'supabase/functions/**'. null = todo o repo."),
+          }),
+          execute: async ({ query, pathGlob }) => {
+            const ref = await loadRepoRef();
+            if (!ref || !repoAvailable()) {
+              return { ok: false, error: "Repositório do projeto não configurado na Central de Evolução." };
+            }
+            try {
+              const hits = await searchRepo(ref, query, { pathGlob: pathGlob ?? undefined });
+              return { ok: true, count: hits.length, hits };
+            } catch (e) {
+              return { ok: false, error: e instanceof Error ? e.message : "Falha na busca." };
+            }
+          },
+        }),
+        create_file: tool({
+          description:
+            "Cria um arquivo baixável para a usuária (PDF, PNG, markdown, CSV, código, SVG, HTML, txt). Para pdf/png, content deve ser HTML completo com estilos inline.",
+          inputSchema: z.object({
+            title: z.string().min(1).max(120).describe("Nome do arquivo, sem extensão."),
+            format: z
+              .enum(["pdf", "png", "markdown", "csv", "code", "svg", "html", "txt"])
+              .describe("Formato final do arquivo."),
+            content: z.string().min(1).max(200000).describe("Conteúdo: HTML para pdf/png, texto bruto nos outros."),
+            language: z
+              .string()
+              .max(30)
+              .nullable()
+              .describe("Linguagem quando format = code (ex.: 'typescript'). null nos outros casos."),
+          }),
+          execute: async ({ title, format, content, language }) => {
+            const { data, error } = await supabase
+              .from("artifacts")
+              .insert({
+                user_id: userId,
+                thread_id: threadId ?? null,
+                kind: format,
+                title,
+                language: language ?? null,
+                content,
+                metadata: { format },
+              })
+              .select("id")
+              .single();
+            if (error) {
+              console.error("create_file insert failed", error);
+              return { ok: false, error: error.message };
+            }
+            return { ok: true, id: data.id, title, format, note: "Arquivo disponível no painel Arquivos." };
+          },
+        }),
         remember: tool({
           description:
             "Save a durable piece of knowledge about the user to long-term memory. Call this when the user states a preference, a correction, a personal fact, or teaches a reusable skill. Do not call it for transient conversation.",
