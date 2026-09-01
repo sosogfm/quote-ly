@@ -1,7 +1,7 @@
 import { corsHeaders, json, requireAdmin } from "../_shared/evolution.ts";
 import { getChatModel, describeAiError } from "../_shared/ai-provider.ts";
-import { generateText, Output } from "npm:ai@5";
-import { z } from "npm:zod@3.25.76";
+import { generateText, Output } from "npm:ai@7";
+import { z } from "npm:zod";
 
 const TestRunSchema = z.object({
   name: z.string().describe("Nome curto do teste"),
@@ -70,15 +70,16 @@ Deno.serve(async (req) => {
 
     let output: z.infer<typeof TestPlanSchema>;
     try {
-      const { model } = getChatModel({ structuredOutputs: false });
+      const { model } = getChatModel({ structuredOutputs: true });
       const result = await generateText({
         model,
         output: Output.object({ schema: TestPlanSchema }),
         system: SYSTEM_PROMPT,
         prompt: `Proposta: ${task.title}\n\nProblema: ${task.problem ?? "-"}\n\nSolução: ${task.solution ?? "-"}\n\nArquivos alterados:\n\n${filesBlock}`,
       });
-      output = result.output;
+      output = TestPlanSchema.parse(result.output);
     } catch (err) {
+      console.error("evolution-test IA erro:", (err as Error)?.message);
       const { message, status } = describeAiError(err);
       return json({ error: message }, status);
     }
