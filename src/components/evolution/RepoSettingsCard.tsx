@@ -139,11 +139,18 @@ export function RepoSettingsCard() {
                 >
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
-                    {(["low", "medium", "high"] as RiskLevel[]).map((r) => (
+                    {(["low", "medium", "high", "critical"] as RiskLevel[]).map((r) => (
                       <SelectItem key={r} value={r}>{RISK_LABELS[r]}</SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
+                {settings.max_auto_risk === "critical" && (
+                  <p className="text-xs text-destructive">
+                    Risco crítico liberado: a IA poderá abrir PR de propostas críticas, mas ainda
+                    exige sua confirmação explícita em cada aplicação.
+                  </p>
+                )}
+
               </div>
               <label className="flex items-end gap-3 pb-2">
                 <Switch
