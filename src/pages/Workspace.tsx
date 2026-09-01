@@ -110,12 +110,18 @@ export default function Workspace() {
   useEffect(() => {
     let cancelled = false;
     async function load() {
+      // Thread just created in this session — keep the in-memory messages.
+      if (threadId && skipLoadRef.current === threadId) {
+        skipLoadRef.current = null;
+        return;
+      }
       savedIds.current = new Set();
       if (!threadId) {
         setMessages([]);
         setInitialMessages([]);
         return;
       }
+
       setLoadingThread(true);
       const { data } = await supabase
         .from("chat_messages")
