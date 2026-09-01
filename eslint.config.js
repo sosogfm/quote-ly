@@ -21,6 +21,18 @@ export default tseslint.config(
       ...reactHooks.configs.recommended.rules,
       "react-refresh/only-export-components": ["warn", { allowConstantExport: true }],
       "@typescript-eslint/no-unused-vars": "off",
+      // Legacy code uses `any` in Supabase row mappings; keep it visible but non-blocking.
+      "@typescript-eslint/no-explicit-any": "warn",
+      // shadcn/ui generates pass-through interfaces with no extra members.
+      "@typescript-eslint/no-empty-object-type": "off",
+    },
+  },
+  {
+    // Tooling configs run in Node and legitimately use require().
+    files: ["*.config.{ts,js}", "**/*.config.{ts,js}"],
+    rules: {
+      "@typescript-eslint/no-require-imports": "off",
     },
   },
 );
+
