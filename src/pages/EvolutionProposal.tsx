@@ -20,6 +20,7 @@ import {
   ArrowLeft,
   Database,
   Loader2,
+  Github,
   RotateCcw,
   ShieldAlert,
   Undo2,
@@ -41,6 +42,7 @@ type TaskRow = {
   requires_migration: boolean;
   migration_confirmed_at: string | null;
   applied_at: string | null;
+  github_pr_url: string | null;
   plan_approved_at: string | null;
   created_at: string;
 };
@@ -83,7 +85,7 @@ export default function EvolutionProposal() {
       supabase
         .from("dev_tasks")
         .select(
-          "id, title, request, problem, evidence, solution, impact, state, risk_level, risks, rollback_plan, estimated_cost, requires_migration, migration_confirmed_at, applied_at, plan_approved_at, created_at",
+          "id, title, request, problem, evidence, solution, impact, state, risk_level, risks, rollback_plan, estimated_cost, requires_migration, migration_confirmed_at, applied_at, github_pr_url, plan_approved_at, created_at",
         )
         .eq("id", id)
         .eq("source", "evolution")

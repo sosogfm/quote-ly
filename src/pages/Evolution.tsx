@@ -7,6 +7,7 @@ import {
 } from "@/components/ui/select";
 import { NewProposalDialog } from "@/components/evolution/NewProposalDialog";
 import { ProposalCard, type ProposalRow } from "@/components/evolution/ProposalCard";
+import { RepoSettingsCard } from "@/components/evolution/RepoSettingsCard";
 import { supabase } from "@/integrations/supabase/client";
 import { STATE_LABELS, RISK_LABELS, type ProposalState, type RiskLevel } from "@/lib/evolution/types";
 import { Loader2, Search, ShieldCheck } from "lucide-react";
@@ -62,10 +63,12 @@ export default function Evolution() {
         <div className="flex items-start gap-2 rounded-lg border border-border bg-muted/40 p-3 text-sm text-muted-foreground">
           <ShieldCheck className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
           <span>
-            Modo patch manual: a IA gera diffs para você revisar e aplicar. Nenhum código ou dado é
-            alterado automaticamente.
+            Nada é alterado sem sua aprovação explícita. Após aprovar, a IA pode abrir um Pull
+            Request no GitHub com o diff — você revisa e faz o merge.
           </span>
         </div>
+
+        <RepoSettingsCard />
 
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
           {[
