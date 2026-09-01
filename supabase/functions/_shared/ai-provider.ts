@@ -226,19 +226,19 @@ export function getAiProviderInfo(): AiProviderInfo {
     return { provider: "none", label: "IA não configurada", model: "", chain: [] };
   }
   const primary = configs[0];
-  const labels: Record<AiProviderName, string> = {
-    groq: "Groq · GPT-OSS 120B (grátis)",
-    openrouter: "OpenRouter · Llama 3.3 70B (grátis)",
-    lovable: "Lovable AI (créditos)",
-  };
   const chain = configs.map((c) => c.name);
-  const chainLabel = chain.length > 1 ? `${chain.join(" + ")} (grátis)`.replace(/\+ lovable.*\)/, "") : labels[primary.name];
-  return {
-    provider: primary.name,
-    label: chain.length > 1 ? `${chain.slice(0, -1).join(" + ")}${chain.includes("lovable") ? " + Lovable" : ""}`.replace(/^\+ /, "") : labels[primary.name],
-    model: primary.modelId,
-    chain,
-  };
+
+  // Lovable is the paid last resort — only surface it in the label when it's
+  // the only configured provider; otherwise show the free chain.
+  const freeNames = chain.filter((n) => n !== "lovable");
+  let label: string;
+  if (freeNames.length > 0) {
+    label = `${freeNames.join(" + ")} (grátis)`;
+  } else {
+    label = "Lovable AI (créditos)";
+  }
+
+  return { provider: primary.name, label, model: primary.modelId, chain };
 }
 
 /** Maps upstream AI errors to clear Portuguese messages. */
