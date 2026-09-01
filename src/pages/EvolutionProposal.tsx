@@ -142,7 +142,19 @@ export default function EvolutionProposal() {
     setActing(false);
 
     if (error) {
-      toast.error("Não foi possível concluir a ação.");
+      // Non-2xx responses (e.g. 409 gate blocks) arrive as FunctionsHttpError —
+      // read the JSON body so the real reason is shown instead of a generic toast.
+      let message = "Não foi possível concluir a ação.";
+      try {
+        const ctx = (error as { context?: Response }).context;
+        if (ctx) {
+          const parsed = await ctx.json();
+          if (parsed?.error) message = String(parsed.error);
+        }
+      } catch {
+        /* keeps the generic message */
+      }
+      toast.error(message);
       return;
     }
     if (data && typeof data === "object" && "error" in data) {
