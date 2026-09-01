@@ -57,8 +57,17 @@ export default function Workspace() {
   const [aiLabel, setAiLabel] = useState<string | null>(null);
   const threadIdRef = useRef<string | null>(threadId ?? null);
   const savedIds = useRef<Set<string>>(new Set());
+  // Thread we just created client-side: its messages live in memory already,
+  // so the route change must not trigger a (re)load that would wipe them.
+  const skipLoadRef = useRef<string | null>(null);
 
-  threadIdRef.current = threadId ?? null;
+  // Only adopt the route param when it names a thread; when the URL is
+  // /workspace (no param) keep the thread created during this session,
+  // otherwise every message would start a brand new conversation.
+  if (threadId && threadIdRef.current !== threadId) {
+    threadIdRef.current = threadId;
+  }
+
 
   const { messages, setMessages, sendMessage, status, stop, error } = useChat({
     transport: new DefaultChatTransport({
