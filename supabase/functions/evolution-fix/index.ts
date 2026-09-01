@@ -126,21 +126,40 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Replace the patches with the corrected set and invalidate the old test runs.
-    const del = await supabase.from("dev_task_files").delete().eq("task_id", taskId);
-    if (del.error) return json({ error: "Não foi possível atualizar os patches." }, 500);
+    // Insert the corrected patches FIRST, then drop the old ones — never delete
+    // before the new set is safely stored (otherwise a failed insert wipes the proposal).
+    const changeTypeMap: Record<string, string> = {
+      create: "created",
+      modify: "modified",
+      delete: "deleted",
+      created: "created",
+      modified: "modified",
+      deleted: "deleted",
+    };
+
+    const oldIds = (
+      await supabase.from("dev_task_files").select("id").eq("task_id", taskId)
+    ).data?.map((r) => r.id as string) ?? [];
 
     const { error: insertError } = await supabase.from("dev_task_files").insert(
       cleaned.map((f) => ({
         task_id: taskId,
+        user_id: userId,
         path: f.path.slice(0, 400),
-        change_type: f.change_type,
+        change_type: changeTypeMap[f.change_type] ?? "modified",
         reason: f.reason?.slice(0, 1000) ?? null,
         language: f.language?.slice(0, 40) ?? null,
         patch: f.patch,
       })),
     );
-    if (insertError) return json({ error: "Não foi possível salvar os patches corrigidos." }, 500);
+    if (insertError) {
+      console.error("evolution-fix insert falhou:", insertError.message);
+      return json({ error: `Não foi possível salvar os patches corrigidos: ${insertError.message}` }, 500);
+    }
+
+    if (oldIds.length > 0) {
+      await supabase.from("dev_task_files").delete().in("id", oldIds);
+    }
 
     await supabase.from("evolution_test_runs").delete().eq("task_id", taskId);
 
