@@ -596,7 +596,11 @@ export default function EvolutionProposal() {
                 <Button
                   variant="secondary"
                   disabled={acting}
-                  onClick={() => runAction("mark_applied")}
+                  onClick={() =>
+                    task?.risk_level === "critical"
+                      ? setMarkCriticalOpen(true)
+                      : runAction("mark_applied")
+                  }
                 >
                   Marcar como aplicada
                 </Button>
