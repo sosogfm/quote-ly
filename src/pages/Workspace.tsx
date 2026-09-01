@@ -31,6 +31,7 @@ import {
   type PromptInputMessage,
 } from "@/components/ai-elements/prompt-input";
 import { Shimmer } from "@/components/ai-elements/shimmer";
+import { AiProviderSelect } from "@/components/AiProviderSelect";
 import { Sparkles } from "lucide-react";
 
 const CHAT_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/chat`;
@@ -203,13 +204,15 @@ export default function Workspace() {
       />
 
       <main className="flex min-w-0 flex-1 flex-col">
-        {aiLabel && (
-          <div className="flex justify-end border-b border-border px-4 py-2">
+        <div className="flex items-center justify-end gap-2 border-b border-border px-4 py-2">
+          {aiLabel && (
             <span className="rounded-full border border-border bg-muted px-3 py-1 text-xs text-muted-foreground">
               IA: {aiLabel}
             </span>
-          </div>
-        )}
+          )}
+          <AiProviderSelect />
+        </div>
+
         <Conversation className="flex-1">
           <ConversationContent className="mx-auto w-full max-w-3xl">
             {messages.length === 0 && !loadingThread ? (
