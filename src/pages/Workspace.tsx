@@ -57,8 +57,17 @@ export default function Workspace() {
   const [aiLabel, setAiLabel] = useState<string | null>(null);
   const threadIdRef = useRef<string | null>(threadId ?? null);
   const savedIds = useRef<Set<string>>(new Set());
+  // Thread we just created client-side: its messages live in memory already,
+  // so the route change must not trigger a (re)load that would wipe them.
+  const skipLoadRef = useRef<string | null>(null);
 
-  threadIdRef.current = threadId ?? null;
+  // Only adopt the route param when it names a thread; when the URL is
+  // /workspace (no param) keep the thread created during this session,
+  // otherwise every message would start a brand new conversation.
+  if (threadId && threadIdRef.current !== threadId) {
+    threadIdRef.current = threadId;
+  }
+
 
   const { messages, setMessages, sendMessage, status, stop, error } = useChat({
     transport: new DefaultChatTransport({
@@ -101,12 +110,18 @@ export default function Workspace() {
   useEffect(() => {
     let cancelled = false;
     async function load() {
+      // Thread just created in this session — keep the in-memory messages.
+      if (threadId && skipLoadRef.current === threadId) {
+        skipLoadRef.current = null;
+        return;
+      }
       savedIds.current = new Set();
       if (!threadId) {
         setMessages([]);
         setInitialMessages([]);
         return;
       }
+
       setLoadingThread(true);
       const { data } = await supabase
         .from("chat_messages")
@@ -177,8 +192,10 @@ export default function Workspace() {
       }
       tid = data.id;
       threadIdRef.current = tid;
-      window.history.replaceState(null, "", `/workspace/${tid}`);
+      skipLoadRef.current = tid;
+      navigate(`/workspace/${tid}`, { replace: true });
       loadSidebar();
+
     }
 
     sendMessage({ text });
