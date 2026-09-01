@@ -7,6 +7,13 @@ import {
   type UIMessage,
 } from "npm:ai@7";
 import { getChatModel, createChainFallbackFetch } from "../_shared/ai-provider.ts";
+import {
+  listRepoFiles,
+  loadRepoRef,
+  readRepoFile,
+  repoAvailable,
+  searchRepo,
+} from "../_shared/repo.ts";
 import { z } from "npm:zod";
 
 const corsHeaders = {
@@ -55,24 +62,38 @@ function createLovableAiGatewayRunIdFetch(initialRunId?: string) {
   };
 }
 
-const SYSTEM_PROMPT = `You are the user's personal AI workspace assistant — a thoughtful, capable collaborator in the spirit of a senior engineer and a sharp writer combined.
+const SYSTEM_PROMPT = `Você é o assistente pessoal de trabalho da usuária: um colaborador técnico direto, no espírito de um engenheiro sênior somado a um bom redator.
 
-Your job is to help with three kinds of work:
-1. Documents and writing — proposals, reports, briefs, plans. Structure output with clear markdown headings, tight prose, no filler.
-2. Code — write complete, runnable code in fenced blocks with the language tag. Prefer clarity over cleverness. Explain trade-offs briefly, not exhaustively.
-3. Thinking and planning — break hard problems into steps, surface assumptions, name the risks.
+Idioma: responda sempre em português do Brasil, salvo se a mensagem estiver em outro idioma.
 
-Principles:
-- Be direct. Skip preamble and self-congratulation.
-- Ask a clarifying question only when the answer would meaningfully change the output.
-- When the user corrects you, adopt the correction for the rest of the conversation.
-- Use markdown for structure: headings, lists, tables, and fenced code blocks.
-- Never invent facts, citations, APIs, or file contents. Say when you're unsure.
+Tom (regras rígidas, sem exceção):
+- NUNCA use emojis, emoticons ou ícones decorativos.
+- NUNCA elogie a usuária nem a pergunta ("ótima pergunta", "excelente ideia", "que legal"). Sem bajulação, sem entusiasmo performático, sem exclamações.
+- Sem preâmbulo e sem resumo do que você "vai fazer": entregue a resposta.
+- Discorde quando for o caso e diga o motivo em uma frase. Se não souber, diga que não sabe.
+- Frases curtas. Zero enchimento. Nada de "espero que ajude".
 
-## Long-term memory
-You have access to the user's long-term memory — personal facts, preferences, writing style, past corrections, and skills they've taught you. Use it to tailor every reply: match their writing style, honor their preferences, and never repeat a correction they already gave. Treat memory as truth unless the user explicitly updates it.
+O que você faz:
+1. Documentos e escrita — propostas, relatórios, briefings, planos. Markdown limpo, prosa enxuta.
+2. Código — completo e executável, em blocos cercados com a linguagem indicada.
+3. Raciocínio e planejamento — quebre o problema em passos, explicite premissas e riscos.
 
-When the user states a durable preference, a correction, a personal fact, or teaches you a reusable skill, call the \`remember\` tool to save it. Call it once per distinct item, not for transient chit-chat. If the user corrects something you previously got wrong, save the correction (kind: "correction") and let it override older memory.`;
+## Código deste próprio sistema
+Você tem acesso de LEITURA ao repositório deste projeto, o mesmo usado pela Central de Evolução. Use as ferramentas \`list_project_files\`, \`read_project_file\` e \`search_project_code\` antes de opinar sobre o funcionamento do sistema — nunca invente nomes de arquivos, funções ou trechos. Você não pode escrever no repositório: mudanças passam por uma proposta na Central de Evolução (explique isso quando a usuária pedir alteração no sistema).
+
+## Arquivos gerados (PDF, PNG, código, planilhas)
+Quando a usuária pedir um arquivo (PDF, imagem/PNG, documento, CSV, código), chame a ferramenta \`create_file\`. Ela cria um arquivo baixável no painel "Arquivos" ao lado da conversa. Escolha o formato:
+- \`pdf\` ou \`png\`: envie HTML completo e bem formatado no campo content (com <style> inline; largura de página A4 para pdf). Não use imagens externas.
+- \`markdown\`, \`csv\`, \`code\`, \`svg\`, \`html\`, \`txt\`: envie o conteúdo bruto.
+Depois de criar, diga em uma linha o que foi gerado. Não repita todo o conteúdo do arquivo na resposta.
+
+## Arquivos enviados pela usuária
+Imagens chegam como anexo e você as vê diretamente. Documentos (PDF, texto, planilha) chegam já extraídos como texto marcado com o nome do arquivo. Trabalhe sobre o conteúdo real; se a extração vier vazia, diga isso.
+
+## Memória de longo prazo
+Você tem acesso à memória da conta: fatos, preferências, estilo de escrita e correções. Use para adaptar cada resposta e nunca repetir uma correção já feita. Trate a memória como verdade até a usuária atualizar.
+
+Quando a usuária declarar uma preferência durável, uma correção, um fato pessoal ou ensinar uma habilidade reutilizável, chame a ferramenta \`remember\`. Uma chamada por item, nunca para conversa passageira.`;
 
 interface MemoryContext {
   summary: string | null;
@@ -211,8 +232,24 @@ Deno.serve(async (req) => {
     const initialRunId = req.headers.get(LOVABLE_AIG_RUN_ID_HEADER)?.trim() || undefined;
     const runIdFetch = createLovableAiGatewayRunIdFetch(initialRunId);
 
-    const chainFetch = await createChainFallbackFetch({ fetch: runIdFetch.fetch as typeof fetch });
-    const { model, provider, modelId } = await getChatModel({ fetch: chainFetch });
+    // Images require a multimodal provider; text-only providers are skipped.
+    const hasImage = messages.some((m) =>
+      Array.isArray(m.parts) &&
+      m.parts.some(
+        (p) =>
+          (p as { type?: string; mediaType?: string }).type === "file" &&
+          ((p as { mediaType?: string }).mediaType ?? "").startsWith("image/"),
+      )
+    );
+
+    const chainFetch = await createChainFallbackFetch({
+      fetch: runIdFetch.fetch as typeof fetch,
+      requireVision: hasImage,
+    });
+    const { model, provider, modelId } = await getChatModel({
+      fetch: chainFetch,
+      requireVision: hasImage,
+    });
     console.log("chat: using provider", provider, modelId, "(with fallback chain)");
 
     const projectBlock = projectInstructions
@@ -227,7 +264,15 @@ Deno.serve(async (req) => {
     const strippedMessages = messages.map((m) => ({
       ...m,
       parts: Array.isArray(m.parts)
-        ? m.parts.filter((p) => p.type !== "reasoning")
+        ? m.parts.filter((p) => {
+            if (p.type === "reasoning") return false;
+            // Non-image attachments are extracted to text on the client;
+            // forwarding their raw bytes breaks the free providers.
+            if (p.type === "file") {
+              return ((p as { mediaType?: string }).mediaType ?? "").startsWith("image/");
+            }
+            return true;
+          })
         : m.parts,
     }));
 
@@ -257,8 +302,112 @@ Deno.serve(async (req) => {
       system,
       messages: await convertToModelMessages(messagesForModel),
       abortSignal: req.signal,
-      stopWhen: stepCountIs(4),
+      stopWhen: stepCountIs(8),
       tools: {
+        list_project_files: tool({
+          description:
+            "Lista os caminhos dos arquivos do código-fonte deste próprio sistema (repositório do projeto). Use antes de ler arquivos para descobrir os caminhos reais.",
+          inputSchema: z.object({
+            filter: z
+              .string()
+              .max(120)
+              .nullable()
+              .describe("Filtro de substring no caminho, ex.: 'supabase/functions' ou '.tsx'. Use null para listar tudo."),
+          }),
+          execute: async ({ filter }) => {
+            const ref = await loadRepoRef();
+            if (!ref || !repoAvailable()) {
+              return { ok: false, error: "Repositório do projeto não configurado na Central de Evolução." };
+            }
+            try {
+              const all = await listRepoFiles(ref);
+              const f = (filter ?? "").trim().toLowerCase();
+              const paths = (f ? all.filter((p) => p.toLowerCase().includes(f)) : all).slice(0, 400);
+              return { ok: true, repo: `${ref.owner}/${ref.repo}@${ref.branch}`, count: paths.length, paths };
+            } catch (e) {
+              return { ok: false, error: e instanceof Error ? e.message : "Falha ao listar arquivos." };
+            }
+          },
+        }),
+        read_project_file: tool({
+          description:
+            "Lê o conteúdo de um arquivo do código-fonte deste sistema. Caminho relativo à raiz do repositório.",
+          inputSchema: z.object({
+            path: z.string().min(1).max(300).describe("Ex.: src/pages/Workspace.tsx"),
+          }),
+          execute: async ({ path }) => {
+            const ref = await loadRepoRef();
+            if (!ref || !repoAvailable()) {
+              return { ok: false, error: "Repositório do projeto não configurado na Central de Evolução." };
+            }
+            try {
+              const file = await readRepoFile(ref, path);
+              return { ok: true, ...file };
+            } catch (e) {
+              return { ok: false, error: e instanceof Error ? e.message : "Falha ao ler o arquivo." };
+            }
+          },
+        }),
+        search_project_code: tool({
+          description:
+            "Busca um texto no código-fonte deste sistema e devolve os trechos com arquivo e linha.",
+          inputSchema: z.object({
+            query: z.string().min(2).max(120).describe("Texto literal a procurar."),
+            pathGlob: z
+              .string()
+              .max(120)
+              .nullable()
+              .describe("Glob opcional para limitar a busca, ex.: 'src/**' ou 'supabase/functions/**'. null = todo o repo."),
+          }),
+          execute: async ({ query, pathGlob }) => {
+            const ref = await loadRepoRef();
+            if (!ref || !repoAvailable()) {
+              return { ok: false, error: "Repositório do projeto não configurado na Central de Evolução." };
+            }
+            try {
+              const hits = await searchRepo(ref, query, { pathGlob: pathGlob ?? undefined });
+              return { ok: true, count: hits.length, hits };
+            } catch (e) {
+              return { ok: false, error: e instanceof Error ? e.message : "Falha na busca." };
+            }
+          },
+        }),
+        create_file: tool({
+          description:
+            "Cria um arquivo baixável para a usuária (PDF, PNG, markdown, CSV, código, SVG, HTML, txt). Para pdf/png, content deve ser HTML completo com estilos inline.",
+          inputSchema: z.object({
+            title: z.string().min(1).max(120).describe("Nome do arquivo, sem extensão."),
+            format: z
+              .enum(["pdf", "png", "markdown", "csv", "code", "svg", "html", "txt"])
+              .describe("Formato final do arquivo."),
+            content: z.string().min(1).max(200000).describe("Conteúdo: HTML para pdf/png, texto bruto nos outros."),
+            language: z
+              .string()
+              .max(30)
+              .nullable()
+              .describe("Linguagem quando format = code (ex.: 'typescript'). null nos outros casos."),
+          }),
+          execute: async ({ title, format, content, language }) => {
+            const { data, error } = await supabase
+              .from("artifacts")
+              .insert({
+                user_id: userId,
+                thread_id: threadId ?? null,
+                kind: format,
+                title,
+                language: language ?? null,
+                content,
+                metadata: { format },
+              })
+              .select("id")
+              .single();
+            if (error) {
+              console.error("create_file insert failed", error);
+              return { ok: false, error: error.message };
+            }
+            return { ok: true, id: data.id, title, format, note: "Arquivo disponível no painel Arquivos." };
+          },
+        }),
         remember: tool({
           description:
             "Save a durable piece of knowledge about the user to long-term memory. Call this when the user states a preference, a correction, a personal fact, or teaches a reusable skill. Do not call it for transient conversation.",
