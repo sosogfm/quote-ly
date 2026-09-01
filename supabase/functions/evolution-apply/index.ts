@@ -1,5 +1,5 @@
 // Applies an approved evolution proposal to the code repository by opening a Pull Request.
-import { streamText, generateText } from "npm:ai@7";
+import { streamText } from "npm:ai@7";
 import {
   corsHeaders,
   json,
