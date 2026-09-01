@@ -366,11 +366,13 @@ export default function EvolutionProposal() {
                 ) : (
                   <FlaskConical className="mr-2 h-4 w-4" />
                 )}
-                Rodar testes com IA
+                Rodar testes
               </Button>
               <span className="text-xs text-muted-foreground">
-                Análise estática do diff feita pela IA (não executa o código).
+                Com Pull Request aberto, busca o resultado real do CI (lint, tipos, testes, build).
+                Sem PR, faz revisão estática determinística do diff.
               </span>
+
             </div>
             {tests.length === 0 ? (
               <p className="text-sm text-muted-foreground">Nenhum teste definido nesta proposta.</p>
