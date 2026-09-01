@@ -192,8 +192,10 @@ export default function Workspace() {
       }
       tid = data.id;
       threadIdRef.current = tid;
-      window.history.replaceState(null, "", `/workspace/${tid}`);
+      skipLoadRef.current = tid;
+      navigate(`/workspace/${tid}`, { replace: true });
       loadSidebar();
+
     }
 
     sendMessage({ text });
