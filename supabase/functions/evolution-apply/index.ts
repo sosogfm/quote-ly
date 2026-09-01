@@ -71,7 +71,7 @@ async function resolveAllContents(
 
   // Use streaming consumed server-side so long generations (many files) keep the
   // connection alive instead of being severed after ~2min of silence.
-  const { text } = await generateWithFallback({}, (model) =>
+  const text = await generateWithFallback({}, (model) =>
     streamText({
       model,
       system:
