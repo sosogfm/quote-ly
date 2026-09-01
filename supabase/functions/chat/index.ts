@@ -302,7 +302,7 @@ Deno.serve(async (req) => {
       system,
       messages: await convertToModelMessages(messagesForModel),
       abortSignal: req.signal,
-      stopWhen: stepCountIs(4),
+      stopWhen: stepCountIs(8),
       tools: {
         list_project_files: tool({
           description:
