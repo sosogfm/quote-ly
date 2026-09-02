@@ -57,6 +57,7 @@ type Props = {
   onSelectThread: (id: string) => void;
   onRenameThread: (id: string, title: string) => void;
   onDeleteThread: (id: string) => void;
+  onDeleteEmptyThreads?: () => void;
 };
 
 export function WorkspaceSidebar({
@@ -67,13 +68,16 @@ export function WorkspaceSidebar({
   onSelectThread,
   onRenameThread,
   onDeleteThread,
+  onDeleteEmptyThreads,
 }: Props) {
   const [collapsed, setCollapsed] = useState(false);
   const [query, setQuery] = useState("");
   const [renamingId, setRenamingId] = useState<string | null>(null);
   const [renameValue, setRenameValue] = useState("");
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [cleaning, setCleaning] = useState(false);
   const { signOut } = useAuth();
+
   const navigate = useNavigate();
 
   const commitRename = (id: string) => {
@@ -185,10 +189,11 @@ export function WorkspaceSidebar({
                       <DropdownMenuTrigger asChild>
                         <button
                           aria-label={`Opções de ${t.title}`}
-                          className="rounded p-1 text-muted-foreground opacity-0 transition-opacity hover:text-foreground focus:opacity-100 group-hover:opacity-100 data-[state=open]:opacity-100"
+                          className="rounded p-1 text-muted-foreground transition-colors hover:text-foreground"
                         >
                           <MoreHorizontal className="h-4 w-4" />
                         </button>
+
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end">
                         <DropdownMenuItem
@@ -214,6 +219,42 @@ export function WorkspaceSidebar({
           </div>
         )}
       </ScrollArea>
+
+      {onDeleteEmptyThreads && (
+        <div className="border-t border-border p-2">
+          <Button
+            variant="ghost"
+            size="sm"
+            className="w-full justify-start gap-2 text-muted-foreground"
+            onClick={() => setCleaning(true)}
+          >
+            <Trash2 className="h-4 w-4" /> Excluir conversas vazias
+          </Button>
+        </div>
+      )}
+
+      <AlertDialog open={cleaning} onOpenChange={setCleaning}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Excluir conversas vazias?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Todas as conversas sem nenhuma mensagem salva serão apagadas.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                onDeleteEmptyThreads?.();
+                setCleaning(false);
+              }}
+            >
+              Excluir
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
 
       <AlertDialog open={!!deletingId} onOpenChange={(o) => !o && setDeletingId(null)}>
         <AlertDialogContent>
