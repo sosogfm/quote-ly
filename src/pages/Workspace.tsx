@@ -397,6 +397,8 @@ export default function Workspace() {
         onSelectThread={(id) => navigate(`/workspace/${id}`)}
         onRenameThread={handleRenameThread}
         onDeleteThread={handleDeleteThread}
+        onDeleteEmptyThreads={handleDeleteEmptyThreads}
+
       />
 
 
