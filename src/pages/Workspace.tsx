@@ -232,32 +232,37 @@ export default function Workspace() {
   }, [messages, status, user, loadSidebar, loadArtifacts, persistMessage]);
 
 
+  // "Nova conversa" is the only thing that creates a thread. It gets its own
+  // URL immediately and every message afterwards stays in that URL.
+  const startNewThread = useCallback(async () => {
+    if (!user) return;
+    const { data, error: insertError } = await supabase
+      .from("threads")
+      .insert({ user_id: user.id, title: "Nova conversa" })
+      .select("id")
+      .single();
+    if (insertError || !data) {
+      toast.error("Não foi possível criar a conversa.");
+      return;
+    }
+    skipLoadRef.current = data.id;
+    threadIdRef.current = data.id;
+    setMessages([]);
+    navigate(`/workspace/${data.id}`);
+    loadSidebar();
+  }, [user, navigate, setMessages, loadSidebar]);
+
   const handleSubmit = async (message: PromptInputMessage) => {
     const text = message.text?.trim();
     const attached = pendingFiles.current;
     if ((!text && attached.length === 0) || !user) return;
 
-    let tid = threadIdRef.current;
+    const tid = threadIdRef.current;
     if (!tid) {
-      const { data, error: insertError } = await supabase
-        .from("threads")
-        .insert({
-          user_id: user.id,
-          title: (text || attached[0]?.name || "Nova conversa").slice(0, 60),
-        })
-        .select("id")
-        .single();
-      if (insertError || !data) {
-        toast.error("Could not start a new chat.");
-        return;
-      }
-      tid = data.id;
-      threadIdRef.current = tid;
-      skipLoadRef.current = tid;
-      navigate(`/workspace/${tid}`, { replace: true });
-      loadSidebar();
-
+      toast.error('Clique em "Nova conversa" para começar.');
+      return;
     }
+
 
     // Images go to the model as image parts; documents are extracted to text
     // on the client so text-only providers can read them too.
