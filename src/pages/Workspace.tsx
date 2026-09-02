@@ -150,33 +150,41 @@ export default function Workspace() {
     loadArtifacts();
   }, [loadArtifacts]);
 
-  // Load messages for the active thread
+  // Keep a stable reference: useChat's setMessages changes identity on every
+  // render, and using it as an effect dep would reload/clear the chat forever.
+  const setMessagesRef = useRef(setMessages);
+  setMessagesRef.current = setMessages;
+  // Thread whose history is already in memory — never load it twice.
+  const loadedThreadRef = useRef<string | null>(null);
+
+  // Load messages for the active thread (only when the thread actually changes)
   useEffect(() => {
+    const tid = threadId ?? null;
+    if (loadedThreadRef.current === tid) return;
+
+    // Thread just created in this session — its messages live in memory.
+    if (tid && skipLoadRef.current === tid) {
+      loadedThreadRef.current = tid;
+      return;
+    }
+    skipLoadRef.current = null;
+    loadedThreadRef.current = tid;
+
     let cancelled = false;
-    async function load() {
-      // Thread just created in this session — keep the in-memory messages,
-      // but only while we are still on that exact thread. Navigating away
-      // clears the flag so coming back always reloads from the database.
-      if (threadId && skipLoadRef.current === threadId) {
-        return;
-      }
-      skipLoadRef.current = null;
+    savedIds.current = new Set();
 
-      savedIds.current = new Set();
-      if (!threadId) {
-        setMessages([]);
-        setInitialMessages([]);
-        return;
-      }
+    if (!tid) {
+      setMessagesRef.current([]);
+      setInitialMessages([]);
+      return;
+    }
 
-
-      // Clear first: never show the previous conversation while loading.
-      setMessages([]);
+    (async () => {
       setLoadingThread(true);
       const { data } = await supabase
         .from("chat_messages")
         .select("id, role, parts, sdk_message_id")
-        .eq("thread_id", threadId)
+        .eq("thread_id", tid)
         .order("created_at", { ascending: true })
         .order("id", { ascending: true });
       if (cancelled) return;
@@ -187,14 +195,15 @@ export default function Workspace() {
       }));
       loaded.forEach((m) => savedIds.current.add(m.id));
       setInitialMessages(loaded);
-      setMessages(loaded);
+      setMessagesRef.current(loaded);
       setLoadingThread(false);
-    }
-    load();
+    })();
+
     return () => {
       cancelled = true;
     };
-  }, [threadId, setMessages]);
+  }, [threadId]);
+
 
   // Save one message, idempotently (unique on thread_id + sdk_message_id).
   const persistMessage = useCallback(
