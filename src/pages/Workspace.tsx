@@ -83,12 +83,13 @@ export default function Workspace() {
   const [extracting, setExtracting] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Only adopt the route param when it names a thread; when the URL is
-  // /workspace (no param) keep the thread created during this session,
-  // otherwise every message would start a brand new conversation.
-  if (threadId && threadIdRef.current !== threadId) {
-    threadIdRef.current = threadId;
+  // The URL is the single source of truth for which conversation is open.
+  // A thread only exists after "Nova conversa" creates one, so sending a
+  // message can never spawn a conversation on its own.
+  if (threadIdRef.current !== (threadId ?? null)) {
+    threadIdRef.current = threadId ?? null;
   }
+
 
 
   const { messages, setMessages, sendMessage, status, stop, error } = useChat({
