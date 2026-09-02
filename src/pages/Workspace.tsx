@@ -405,21 +405,27 @@ export default function Workspace() {
         <Conversation className="flex-1">
           <ConversationContent className="mx-auto w-full max-w-3xl">
             {messages.length === 0 && !loadingThread ? (
-              <ConversationEmptyState
-                icon={<Sparkles className="h-6 w-6" />}
-                title={threadId ? "O que vamos construir hoje?" : "Nenhuma conversa aberta"}
-                description={
-                  threadId
-                    ? "Peça um documento, um PDF, um plano ou código. Envie imagens e arquivos para análise."
-                    : "Clique em Nova conversa para começar."
-                }
-              >
+              <ConversationEmptyState icon={<Sparkles className="h-6 w-6" />}>
+                <div className="text-muted-foreground">
+                  <Sparkles className="h-6 w-6" />
+                </div>
+                <div className="space-y-1">
+                  <h3 className="text-sm font-medium">
+                    {threadId ? "O que vamos construir hoje?" : "Nenhuma conversa aberta"}
+                  </h3>
+                  <p className="text-sm text-muted-foreground">
+                    {threadId
+                      ? "Peça um documento, um PDF, um plano ou código. Envie imagens e arquivos para análise."
+                      : "Clique em Nova conversa para começar."}
+                  </p>
+                </div>
                 {!threadId && (
                   <Button onClick={startNewThread} className="gap-2">
                     <Plus className="h-4 w-4" /> Nova conversa
                   </Button>
                 )}
               </ConversationEmptyState>
+
 
             ) : (
               messages.map((m) => (
