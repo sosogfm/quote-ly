@@ -170,6 +170,8 @@ export default function Workspace() {
       }
 
 
+      // Clear first: never show the previous conversation while loading.
+      setMessages([]);
       setLoadingThread(true);
       const { data } = await supabase
         .from("chat_messages")
