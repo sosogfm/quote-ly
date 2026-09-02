@@ -31,10 +31,10 @@ import {
   PanelLeftClose,
   PanelLeftOpen,
   Sparkles,
-  MoreHorizontal,
   Pencil,
   Trash2,
 } from "lucide-react";
+
 import { useAuth } from "@/contexts/AuthContext";
 
 export type ThreadSummary = {
