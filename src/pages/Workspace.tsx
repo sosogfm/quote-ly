@@ -154,10 +154,12 @@ export default function Workspace() {
     let cancelled = false;
     async function load() {
       // Thread just created in this session — keep the in-memory messages.
+      // The flag stays set (instead of being consumed) so a remount or a
+      // double-invoked effect can't wipe the conversation and orphan it.
       if (threadId && skipLoadRef.current === threadId) {
-        skipLoadRef.current = null;
         return;
       }
+
       savedIds.current = new Set();
       if (!threadId) {
         setMessages([]);
