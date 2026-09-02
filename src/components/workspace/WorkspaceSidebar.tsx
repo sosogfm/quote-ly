@@ -41,6 +41,7 @@ export type ThreadSummary = {
   id: string;
   title: string;
   updated_at: string;
+  last_message_at: string;
   project_id: string | null;
 };
 

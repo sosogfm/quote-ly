@@ -108,8 +108,8 @@ export default function Workspace() {
     const [{ data: t }, { data: p }] = await Promise.all([
       supabase
         .from("threads")
-        .select("id, title, updated_at, project_id")
-        .order("updated_at", { ascending: false })
+        .select("id, title, updated_at, last_message_at, project_id")
+        .order("last_message_at", { ascending: false })
         .limit(50),
       supabase.from("projects").select("id, name, color").order("created_at"),
     ]);
@@ -228,7 +228,7 @@ export default function Workspace() {
       for (const m of pending) await persistMessage(tid, m);
       await supabase
         .from("threads")
-        .update({ updated_at: new Date().toISOString() })
+        .update({ last_message_at: new Date().toISOString() })
         .eq("id", tid);
       loadSidebar();
       loadArtifacts();
