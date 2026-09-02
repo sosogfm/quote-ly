@@ -37,7 +37,7 @@ import { ArtifactsPanel } from "@/components/workspace/ArtifactsPanel";
 import { extractFileText, isImage } from "@/lib/fileExtract";
 import type { ArtifactLike } from "@/lib/artifactDownload";
 import { Button } from "@/components/ui/button";
-import { Paperclip, PanelRight, Sparkles, X } from "lucide-react";
+import { Paperclip, PanelRight, Plus, Sparkles, X } from "lucide-react";
 
 const CHAT_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/chat`;
 const AI_STATUS_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/ai-status`;
@@ -83,12 +83,13 @@ export default function Workspace() {
   const [extracting, setExtracting] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Only adopt the route param when it names a thread; when the URL is
-  // /workspace (no param) keep the thread created during this session,
-  // otherwise every message would start a brand new conversation.
-  if (threadId && threadIdRef.current !== threadId) {
-    threadIdRef.current = threadId;
+  // The URL is the single source of truth for which conversation is open.
+  // A thread only exists after "Nova conversa" creates one, so sending a
+  // message can never spawn a conversation on its own.
+  if (threadIdRef.current !== (threadId ?? null)) {
+    threadIdRef.current = threadId ?? null;
   }
+
 
 
   const { messages, setMessages, sendMessage, status, stop, error } = useChat({
@@ -231,32 +232,37 @@ export default function Workspace() {
   }, [messages, status, user, loadSidebar, loadArtifacts, persistMessage]);
 
 
+  // "Nova conversa" is the only thing that creates a thread. It gets its own
+  // URL immediately and every message afterwards stays in that URL.
+  const startNewThread = useCallback(async () => {
+    if (!user) return;
+    const { data, error: insertError } = await supabase
+      .from("threads")
+      .insert({ user_id: user.id, title: "Nova conversa" })
+      .select("id")
+      .single();
+    if (insertError || !data) {
+      toast.error("Não foi possível criar a conversa.");
+      return;
+    }
+    skipLoadRef.current = data.id;
+    threadIdRef.current = data.id;
+    setMessages([]);
+    navigate(`/workspace/${data.id}`);
+    loadSidebar();
+  }, [user, navigate, setMessages, loadSidebar]);
+
   const handleSubmit = async (message: PromptInputMessage) => {
     const text = message.text?.trim();
     const attached = pendingFiles.current;
     if ((!text && attached.length === 0) || !user) return;
 
-    let tid = threadIdRef.current;
+    const tid = threadIdRef.current;
     if (!tid) {
-      const { data, error: insertError } = await supabase
-        .from("threads")
-        .insert({
-          user_id: user.id,
-          title: (text || attached[0]?.name || "Nova conversa").slice(0, 60),
-        })
-        .select("id")
-        .single();
-      if (insertError || !data) {
-        toast.error("Could not start a new chat.");
-        return;
-      }
-      tid = data.id;
-      threadIdRef.current = tid;
-      skipLoadRef.current = tid;
-      navigate(`/workspace/${tid}`, { replace: true });
-      loadSidebar();
-
+      toast.error('Clique em "Nova conversa" para começar.');
+      return;
     }
+
 
     // Images go to the model as image parts; documents are extracted to text
     // on the client so text-only providers can read them too.
@@ -298,7 +304,17 @@ export default function Workspace() {
     };
     void persistMessage(tid, userMessage);
     sendMessage(userMessage);
+
+    // Give the still-unnamed thread a title from its first message.
+    const current = threads.find((t) => t.id === tid);
+    if (prompt && (!current || current.title === "Nova conversa")) {
+      const title = prompt.slice(0, 60);
+      setThreads((prev) => prev.map((t) => (t.id === tid ? { ...t, title } : t)));
+      await supabase.from("threads").update({ title }).eq("id", tid);
+      loadSidebar();
+    }
   };
+
 
 
   const addFiles = (list: FileList | null) => {
@@ -357,16 +373,12 @@ export default function Workspace() {
         threads={threads}
         projects={projects}
         activeThreadId={threadId ?? null}
-        onNewChat={() => {
-          threadIdRef.current = null;
-          navigate("/workspace");
-        }}
+        onNewChat={startNewThread}
         onSelectThread={(id) => navigate(`/workspace/${id}`)}
         onRenameThread={handleRenameThread}
         onDeleteThread={handleDeleteThread}
-        
-
       />
+
 
 
       <main className="flex min-w-0 flex-1 flex-col">
@@ -393,11 +405,28 @@ export default function Workspace() {
         <Conversation className="flex-1">
           <ConversationContent className="mx-auto w-full max-w-3xl">
             {messages.length === 0 && !loadingThread ? (
-              <ConversationEmptyState
-                icon={<Sparkles className="h-6 w-6" />}
-                title="O que vamos construir hoje?"
-                description="Peça um documento, um PDF, um plano ou código. Envie imagens e arquivos para análise."
-              />
+              <ConversationEmptyState icon={<Sparkles className="h-6 w-6" />}>
+                <div className="text-muted-foreground">
+                  <Sparkles className="h-6 w-6" />
+                </div>
+                <div className="space-y-1">
+                  <h3 className="text-sm font-medium">
+                    {threadId ? "O que vamos construir hoje?" : "Nenhuma conversa aberta"}
+                  </h3>
+                  <p className="text-sm text-muted-foreground">
+                    {threadId
+                      ? "Peça um documento, um PDF, um plano ou código. Envie imagens e arquivos para análise."
+                      : "Clique em Nova conversa para começar."}
+                  </p>
+                </div>
+                {!threadId && (
+                  <Button onClick={startNewThread} className="gap-2">
+                    <Plus className="h-4 w-4" /> Nova conversa
+                  </Button>
+                )}
+              </ConversationEmptyState>
+
+
             ) : (
               messages.map((m) => (
                 <Message from={m.role} key={m.id}>
