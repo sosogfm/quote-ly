@@ -284,10 +284,22 @@ export default function Workspace() {
 
     pendingFiles.current = [];
     setAttachedNames([]);
-    sendMessage(
-      imageParts.length > 0 ? { text: prompt, files: imageParts } : { text: prompt },
-    );
+
+    // Own the message id so the user's turn can be stored right away — if the
+    // answer fails or the tab closes, the question is not lost. The upsert is
+    // idempotent, so the persist effect can't duplicate it later.
+    const userMessage: UIMessage = {
+      id: crypto.randomUUID(),
+      role: "user",
+      parts: [
+        ...(prompt ? [{ type: "text" as const, text: prompt }] : []),
+        ...imageParts,
+      ],
+    };
+    void persistMessage(tid, userMessage);
+    sendMessage(userMessage);
   };
+
 
   const addFiles = (list: FileList | null) => {
     if (!list || list.length === 0) return;
