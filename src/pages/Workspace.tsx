@@ -347,39 +347,6 @@ export default function Workspace() {
     loadSidebar();
   };
 
-  // Leftovers from the old bug where every message spawned a new thread:
-  // threads that never got a single message saved.
-  const handleDeleteEmptyThreads = async () => {
-    if (!user) return;
-    const { data: rows, error: readError } = await supabase
-      .from("chat_messages")
-      .select("thread_id")
-      .eq("user_id", user.id);
-    if (readError) {
-      toast.error("Não foi possível verificar as conversas.");
-      return;
-    }
-    const withMessages = new Set((rows ?? []).map((r) => r.thread_id));
-    const empty = threads
-      .filter((t) => !withMessages.has(t.id) && t.id !== threadIdRef.current)
-      .map((t) => t.id);
-    if (empty.length === 0) {
-      toast.info("Nenhuma conversa vazia encontrada.");
-      return;
-    }
-    const { error: deleteError } = await supabase
-      .from("threads")
-      .delete()
-      .in("id", empty);
-    if (deleteError) {
-      toast.error("Não foi possível excluir as conversas vazias.");
-      return;
-    }
-    toast.success(
-      `${empty.length} ${empty.length === 1 ? "conversa vazia excluída" : "conversas vazias excluídas"}.`,
-    );
-    loadSidebar();
-  };
 
 
   const busy = status === "submitted" || status === "streaming";
