@@ -57,6 +57,7 @@ type Props = {
   onSelectThread: (id: string) => void;
   onRenameThread: (id: string, title: string) => void;
   onDeleteThread: (id: string) => void;
+  onDeleteEmptyThreads?: () => void;
 };
 
 export function WorkspaceSidebar({
@@ -67,13 +68,16 @@ export function WorkspaceSidebar({
   onSelectThread,
   onRenameThread,
   onDeleteThread,
+  onDeleteEmptyThreads,
 }: Props) {
   const [collapsed, setCollapsed] = useState(false);
   const [query, setQuery] = useState("");
   const [renamingId, setRenamingId] = useState<string | null>(null);
   const [renameValue, setRenameValue] = useState("");
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [cleaning, setCleaning] = useState(false);
   const { signOut } = useAuth();
+
   const navigate = useNavigate();
 
   const commitRename = (id: string) => {
