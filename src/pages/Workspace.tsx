@@ -304,7 +304,17 @@ export default function Workspace() {
     };
     void persistMessage(tid, userMessage);
     sendMessage(userMessage);
+
+    // Give the still-unnamed thread a title from its first message.
+    const current = threads.find((t) => t.id === tid);
+    if (prompt && (!current || current.title === "Nova conversa")) {
+      const title = prompt.slice(0, 60);
+      setThreads((prev) => prev.map((t) => (t.id === tid ? { ...t, title } : t)));
+      await supabase.from("threads").update({ title }).eq("id", tid);
+      loadSidebar();
+    }
   };
+
 
 
   const addFiles = (list: FileList | null) => {
