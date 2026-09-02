@@ -291,6 +291,37 @@ export default function Workspace() {
     if (error) toast.error(error.message || "Something went wrong.");
   }, [error]);
 
+  const handleRenameThread = async (id: string, title: string) => {
+    setThreads((prev) => prev.map((t) => (t.id === id ? { ...t, title } : t)));
+    const { error: updateError } = await supabase
+      .from("threads")
+      .update({ title })
+      .eq("id", id);
+    if (updateError) {
+      toast.error("Não foi possível renomear a conversa.");
+      loadSidebar();
+    }
+  };
+
+  const handleDeleteThread = async (id: string) => {
+    setThreads((prev) => prev.filter((t) => t.id !== id));
+    const { error: deleteError } = await supabase.from("threads").delete().eq("id", id);
+    if (deleteError) {
+      toast.error("Não foi possível excluir a conversa.");
+      loadSidebar();
+      return;
+    }
+    toast.success("Conversa excluída.");
+    if (threadIdRef.current === id) {
+      threadIdRef.current = null;
+      setMessages([]);
+      navigate("/workspace");
+    }
+    loadSidebar();
+  };
+
+
+
   const busy = status === "submitted" || status === "streaming";
 
   return (
