@@ -133,7 +133,10 @@ export default function Evolution() {
           </Card>
         ) : (
           <div className="grid gap-3">
-            {filtered.map((p) => <ProposalCard key={p.id} proposal={p} />)}
+            {filtered.map((p) => (
+              <ProposalCard key={p.id} proposal={p} onDeleted={load} />
+            ))}
+
           </div>
         )}
       </div>

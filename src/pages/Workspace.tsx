@@ -154,10 +154,12 @@ export default function Workspace() {
     let cancelled = false;
     async function load() {
       // Thread just created in this session — keep the in-memory messages.
+      // The flag stays set (instead of being consumed) so a remount or a
+      // double-invoked effect can't wipe the conversation and orphan it.
       if (threadId && skipLoadRef.current === threadId) {
-        skipLoadRef.current = null;
         return;
       }
+
       savedIds.current = new Set();
       if (!threadId) {
         setMessages([]);
@@ -291,6 +293,37 @@ export default function Workspace() {
     if (error) toast.error(error.message || "Something went wrong.");
   }, [error]);
 
+  const handleRenameThread = async (id: string, title: string) => {
+    setThreads((prev) => prev.map((t) => (t.id === id ? { ...t, title } : t)));
+    const { error: updateError } = await supabase
+      .from("threads")
+      .update({ title })
+      .eq("id", id);
+    if (updateError) {
+      toast.error("Não foi possível renomear a conversa.");
+      loadSidebar();
+    }
+  };
+
+  const handleDeleteThread = async (id: string) => {
+    setThreads((prev) => prev.filter((t) => t.id !== id));
+    const { error: deleteError } = await supabase.from("threads").delete().eq("id", id);
+    if (deleteError) {
+      toast.error("Não foi possível excluir a conversa.");
+      loadSidebar();
+      return;
+    }
+    toast.success("Conversa excluída.");
+    if (threadIdRef.current === id) {
+      threadIdRef.current = null;
+      setMessages([]);
+      navigate("/workspace");
+    }
+    loadSidebar();
+  };
+
+
+
   const busy = status === "submitted" || status === "streaming";
 
   return (
@@ -304,7 +337,10 @@ export default function Workspace() {
           navigate("/workspace");
         }}
         onSelectThread={(id) => navigate(`/workspace/${id}`)}
+        onRenameThread={handleRenameThread}
+        onDeleteThread={handleDeleteThread}
       />
+
 
       <main className="flex min-w-0 flex-1 flex-col">
         <div className="flex items-center justify-end gap-2 border-b border-border px-4 py-2">
