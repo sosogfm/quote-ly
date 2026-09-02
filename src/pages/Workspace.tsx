@@ -304,7 +304,10 @@ export default function Workspace() {
           navigate("/workspace");
         }}
         onSelectThread={(id) => navigate(`/workspace/${id}`)}
+        onRenameThread={handleRenameThread}
+        onDeleteThread={handleDeleteThread}
       />
+
 
       <main className="flex min-w-0 flex-1 flex-col">
         <div className="flex items-center justify-end gap-2 border-b border-border px-4 py-2">
