@@ -5,6 +5,22 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import {
   Plus,
   Search,
   MessageSquare,
@@ -14,6 +30,9 @@ import {
   PanelLeftClose,
   PanelLeftOpen,
   Sparkles,
+  MoreHorizontal,
+  Pencil,
+  Trash2,
 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 
@@ -36,6 +55,8 @@ type Props = {
   activeThreadId: string | null;
   onNewChat: () => void;
   onSelectThread: (id: string) => void;
+  onRenameThread: (id: string, title: string) => void;
+  onDeleteThread: (id: string) => void;
 };
 
 export function WorkspaceSidebar({
@@ -44,11 +65,23 @@ export function WorkspaceSidebar({
   activeThreadId,
   onNewChat,
   onSelectThread,
+  onRenameThread,
+  onDeleteThread,
 }: Props) {
   const [collapsed, setCollapsed] = useState(false);
   const [query, setQuery] = useState("");
+  const [renamingId, setRenamingId] = useState<string | null>(null);
+  const [renameValue, setRenameValue] = useState("");
+  const [deletingId, setDeletingId] = useState<string | null>(null);
   const { signOut } = useAuth();
   const navigate = useNavigate();
+
+  const commitRename = (id: string) => {
+    const next = renameValue.trim();
+    setRenamingId(null);
+    if (next) onRenameThread(id, next.slice(0, 80));
+  };
+
 
   const filtered = query.trim()
     ? threads.filter((t) => t.title.toLowerCase().includes(query.trim().toLowerCase()))
