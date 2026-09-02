@@ -5,11 +5,12 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
+  ContextMenu,
+  ContextMenuContent,
+  ContextMenuItem,
+  ContextMenuTrigger,
+} from "@/components/ui/context-menu";
+
 import {
   AlertDialog,
   AlertDialogAction,
@@ -30,10 +31,10 @@ import {
   PanelLeftClose,
   PanelLeftOpen,
   Sparkles,
-  MoreHorizontal,
   Pencil,
   Trash2,
 } from "lucide-react";
+
 import { useAuth } from "@/contexts/AuthContext";
 
 export type ThreadSummary = {
@@ -57,7 +58,6 @@ type Props = {
   onSelectThread: (id: string) => void;
   onRenameThread: (id: string, title: string) => void;
   onDeleteThread: (id: string) => void;
-  onDeleteEmptyThreads?: () => void;
 };
 
 export function WorkspaceSidebar({
@@ -68,23 +68,27 @@ export function WorkspaceSidebar({
   onSelectThread,
   onRenameThread,
   onDeleteThread,
-  onDeleteEmptyThreads,
 }: Props) {
   const [collapsed, setCollapsed] = useState(false);
   const [query, setQuery] = useState("");
   const [renamingId, setRenamingId] = useState<string | null>(null);
   const [renameValue, setRenameValue] = useState("");
   const [deletingId, setDeletingId] = useState<string | null>(null);
-  const [cleaning, setCleaning] = useState(false);
   const { signOut } = useAuth();
 
   const navigate = useNavigate();
+
+  const startRename = (t: ThreadSummary) => {
+    setRenamingId(t.id);
+    setRenameValue(t.title);
+  };
 
   const commitRename = (id: string) => {
     const next = renameValue.trim();
     setRenamingId(null);
     if (next) onRenameThread(id, next.slice(0, 80));
   };
+
 
 
   const filtered = query.trim()
@@ -157,103 +161,62 @@ export function WorkspaceSidebar({
         ) : (
           <div className="space-y-0.5 pb-4">
             {filtered.map((t) => (
-              <div
-                key={t.id}
-                className={cn(
-                  "group flex w-full items-center gap-1 rounded-md pr-1 transition-colors hover:bg-accent",
-                  activeThreadId === t.id && "bg-accent font-medium",
-                )}
-              >
-                {renamingId === t.id ? (
-                  <Input
-                    autoFocus
-                    value={renameValue}
-                    onChange={(e) => setRenameValue(e.target.value)}
-                    onBlur={() => commitRename(t.id)}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter") commitRename(t.id);
-                      if (e.key === "Escape") setRenamingId(null);
-                    }}
-                    className="h-7 text-sm"
-                  />
-                ) : (
-                  <>
-                    <button
-                      onClick={() => onSelectThread(t.id)}
-                      className="flex min-w-0 flex-1 items-center gap-2 px-2 py-1.5 text-left text-sm"
-                    >
-                      <MessageSquare className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
-                      <span className="truncate">{t.title}</span>
-                    </button>
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <button
-                          aria-label={`Opções de ${t.title}`}
-                          className="rounded p-1 text-muted-foreground transition-colors hover:text-foreground"
-                        >
-                          <MoreHorizontal className="h-4 w-4" />
-                        </button>
-
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end">
-                        <DropdownMenuItem
-                          onClick={() => {
-                            setRenamingId(t.id);
-                            setRenameValue(t.title);
-                          }}
-                        >
-                          <Pencil className="mr-2 h-3.5 w-3.5" /> Renomear
-                        </DropdownMenuItem>
-                        <DropdownMenuItem
-                          className="text-destructive focus:text-destructive"
-                          onClick={() => setDeletingId(t.id)}
-                        >
-                          <Trash2 className="mr-2 h-3.5 w-3.5" /> Excluir
-                        </DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  </>
-                )}
-              </div>
+              <ContextMenu key={t.id}>
+                <ContextMenuTrigger asChild>
+                  <div
+                    className={cn(
+                      "flex w-full items-center gap-1 rounded-md pr-1 transition-colors hover:bg-accent",
+                      activeThreadId === t.id && "bg-accent font-medium",
+                    )}
+                  >
+                    {renamingId === t.id ? (
+                      <Input
+                        autoFocus
+                        value={renameValue}
+                        onChange={(e) => setRenameValue(e.target.value)}
+                        onBlur={() => commitRename(t.id)}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter") commitRename(t.id);
+                          if (e.key === "Escape") setRenamingId(null);
+                        }}
+                        className="h-7 text-sm"
+                      />
+                    ) : (
+                      <button
+                        // Click on the open conversation's name edits it;
+                        // clicking another conversation just opens it.
+                        onClick={() => {
+                          if (activeThreadId === t.id) startRename(t);
+                          else onSelectThread(t.id);
+                        }}
+                        onDoubleClick={() => startRename(t)}
+                        title="Clique no nome da conversa aberta para renomear · botão direito para mais opções"
+                        className="flex min-w-0 flex-1 items-center gap-2 px-2 py-1.5 text-left text-sm"
+                      >
+                        <MessageSquare className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+                        <span className="truncate">{t.title}</span>
+                      </button>
+                    )}
+                  </div>
+                </ContextMenuTrigger>
+                <ContextMenuContent className="w-44">
+                  <ContextMenuItem onClick={() => startRename(t)}>
+                    <Pencil className="mr-2 h-3.5 w-3.5" /> Renomear
+                  </ContextMenuItem>
+                  <ContextMenuItem
+                    className="text-destructive focus:text-destructive"
+                    onClick={() => setDeletingId(t.id)}
+                  >
+                    <Trash2 className="mr-2 h-3.5 w-3.5" /> Excluir
+                  </ContextMenuItem>
+                </ContextMenuContent>
+              </ContextMenu>
             ))}
           </div>
         )}
       </ScrollArea>
 
-      {onDeleteEmptyThreads && (
-        <div className="border-t border-border p-2">
-          <Button
-            variant="ghost"
-            size="sm"
-            className="w-full justify-start gap-2 text-muted-foreground"
-            onClick={() => setCleaning(true)}
-          >
-            <Trash2 className="h-4 w-4" /> Excluir conversas vazias
-          </Button>
-        </div>
-      )}
 
-      <AlertDialog open={cleaning} onOpenChange={setCleaning}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Excluir conversas vazias?</AlertDialogTitle>
-            <AlertDialogDescription>
-              Todas as conversas sem nenhuma mensagem salva serão apagadas.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancelar</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={() => {
-                onDeleteEmptyThreads?.();
-                setCleaning(false);
-              }}
-            >
-              Excluir
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
 
 
       <AlertDialog open={!!deletingId} onOpenChange={(o) => !o && setDeletingId(null)}>
