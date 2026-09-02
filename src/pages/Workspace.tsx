@@ -373,16 +373,12 @@ export default function Workspace() {
         threads={threads}
         projects={projects}
         activeThreadId={threadId ?? null}
-        onNewChat={() => {
-          threadIdRef.current = null;
-          navigate("/workspace");
-        }}
+        onNewChat={startNewThread}
         onSelectThread={(id) => navigate(`/workspace/${id}`)}
         onRenameThread={handleRenameThread}
         onDeleteThread={handleDeleteThread}
-        
-
       />
+
 
 
       <main className="flex min-w-0 flex-1 flex-col">
