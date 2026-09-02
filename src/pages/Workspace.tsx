@@ -37,7 +37,7 @@ import { ArtifactsPanel } from "@/components/workspace/ArtifactsPanel";
 import { extractFileText, isImage } from "@/lib/fileExtract";
 import type { ArtifactLike } from "@/lib/artifactDownload";
 import { Button } from "@/components/ui/button";
-import { Paperclip, PanelRight, Sparkles, X } from "lucide-react";
+import { Paperclip, PanelRight, Plus, Sparkles, X } from "lucide-react";
 
 const CHAT_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/chat`;
 const AI_STATUS_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/ai-status`;
