@@ -108,8 +108,8 @@ export default function Workspace() {
     const [{ data: t }, { data: p }] = await Promise.all([
       supabase
         .from("threads")
-        .select("id, title, updated_at, project_id")
-        .order("updated_at", { ascending: false })
+        .select("id, title, updated_at, last_message_at, project_id")
+        .order("last_message_at", { ascending: false })
         .limit(50),
       supabase.from("projects").select("id, name, color").order("created_at"),
     ]);
@@ -154,12 +154,13 @@ export default function Workspace() {
   useEffect(() => {
     let cancelled = false;
     async function load() {
-      // Thread just created in this session — keep the in-memory messages.
-      // The flag stays set (instead of being consumed) so a remount or a
-      // double-invoked effect can't wipe the conversation and orphan it.
+      // Thread just created in this session — keep the in-memory messages,
+      // but only while we are still on that exact thread. Navigating away
+      // clears the flag so coming back always reloads from the database.
       if (threadId && skipLoadRef.current === threadId) {
         return;
       }
+      skipLoadRef.current = null;
 
       savedIds.current = new Set();
       if (!threadId) {
@@ -168,6 +169,9 @@ export default function Workspace() {
         return;
       }
 
+
+      // Clear first: never show the previous conversation while loading.
+      setMessages([]);
       setLoadingThread(true);
       const { data } = await supabase
         .from("chat_messages")
@@ -224,7 +228,7 @@ export default function Workspace() {
       for (const m of pending) await persistMessage(tid, m);
       await supabase
         .from("threads")
-        .update({ updated_at: new Date().toISOString() })
+        .update({ last_message_at: new Date().toISOString() })
         .eq("id", tid);
       loadSidebar();
       loadArtifacts();
