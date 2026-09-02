@@ -120,21 +120,90 @@ export function WorkspaceSidebar({
         ) : (
           <div className="space-y-0.5 pb-4">
             {filtered.map((t) => (
-              <button
+              <div
                 key={t.id}
-                onClick={() => onSelectThread(t.id)}
                 className={cn(
-                  "flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm transition-colors hover:bg-accent",
+                  "group flex w-full items-center gap-1 rounded-md pr-1 transition-colors hover:bg-accent",
                   activeThreadId === t.id && "bg-accent font-medium",
                 )}
               >
-                <MessageSquare className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
-                <span className="truncate">{t.title}</span>
-              </button>
+                {renamingId === t.id ? (
+                  <Input
+                    autoFocus
+                    value={renameValue}
+                    onChange={(e) => setRenameValue(e.target.value)}
+                    onBlur={() => commitRename(t.id)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") commitRename(t.id);
+                      if (e.key === "Escape") setRenamingId(null);
+                    }}
+                    className="h-7 text-sm"
+                  />
+                ) : (
+                  <>
+                    <button
+                      onClick={() => onSelectThread(t.id)}
+                      className="flex min-w-0 flex-1 items-center gap-2 px-2 py-1.5 text-left text-sm"
+                    >
+                      <MessageSquare className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+                      <span className="truncate">{t.title}</span>
+                    </button>
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <button
+                          aria-label={`Opções de ${t.title}`}
+                          className="rounded p-1 text-muted-foreground opacity-0 transition-opacity hover:text-foreground focus:opacity-100 group-hover:opacity-100 data-[state=open]:opacity-100"
+                        >
+                          <MoreHorizontal className="h-4 w-4" />
+                        </button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end">
+                        <DropdownMenuItem
+                          onClick={() => {
+                            setRenamingId(t.id);
+                            setRenameValue(t.title);
+                          }}
+                        >
+                          <Pencil className="mr-2 h-3.5 w-3.5" /> Renomear
+                        </DropdownMenuItem>
+                        <DropdownMenuItem
+                          className="text-destructive focus:text-destructive"
+                          onClick={() => setDeletingId(t.id)}
+                        >
+                          <Trash2 className="mr-2 h-3.5 w-3.5" /> Excluir
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  </>
+                )}
+              </div>
             ))}
           </div>
         )}
       </ScrollArea>
+
+      <AlertDialog open={!!deletingId} onOpenChange={(o) => !o && setDeletingId(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Excluir conversa?</AlertDialogTitle>
+            <AlertDialogDescription>
+              As mensagens dessa conversa serão apagadas permanentemente.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                if (deletingId) onDeleteThread(deletingId);
+                setDeletingId(null);
+              }}
+            >
+              Excluir
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
 
       <div className="border-t border-border p-2">
         <Button variant="ghost" size="sm" className="w-full justify-start gap-2" asChild>
