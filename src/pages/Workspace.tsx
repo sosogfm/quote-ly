@@ -154,12 +154,13 @@ export default function Workspace() {
   useEffect(() => {
     let cancelled = false;
     async function load() {
-      // Thread just created in this session — keep the in-memory messages.
-      // The flag stays set (instead of being consumed) so a remount or a
-      // double-invoked effect can't wipe the conversation and orphan it.
+      // Thread just created in this session — keep the in-memory messages,
+      // but only while we are still on that exact thread. Navigating away
+      // clears the flag so coming back always reloads from the database.
       if (threadId && skipLoadRef.current === threadId) {
         return;
       }
+      skipLoadRef.current = null;
 
       savedIds.current = new Set();
       if (!threadId) {
@@ -167,6 +168,7 @@ export default function Workspace() {
         setInitialMessages([]);
         return;
       }
+
 
       setLoadingThread(true);
       const { data } = await supabase
