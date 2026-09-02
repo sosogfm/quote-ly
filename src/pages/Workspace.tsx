@@ -407,9 +407,20 @@ export default function Workspace() {
             {messages.length === 0 && !loadingThread ? (
               <ConversationEmptyState
                 icon={<Sparkles className="h-6 w-6" />}
-                title="O que vamos construir hoje?"
-                description="Peça um documento, um PDF, um plano ou código. Envie imagens e arquivos para análise."
-              />
+                title={threadId ? "O que vamos construir hoje?" : "Nenhuma conversa aberta"}
+                description={
+                  threadId
+                    ? "Peça um documento, um PDF, um plano ou código. Envie imagens e arquivos para análise."
+                    : "Clique em Nova conversa para começar."
+                }
+              >
+                {!threadId && (
+                  <Button onClick={startNewThread} className="gap-2">
+                    <Plus className="h-4 w-4" /> Nova conversa
+                  </Button>
+                )}
+              </ConversationEmptyState>
+
             ) : (
               messages.map((m) => (
                 <Message from={m.role} key={m.id}>
