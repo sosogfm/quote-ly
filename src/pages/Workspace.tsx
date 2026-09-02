@@ -172,7 +172,8 @@ export default function Workspace() {
         .from("chat_messages")
         .select("id, role, parts, sdk_message_id")
         .eq("thread_id", threadId)
-        .order("created_at", { ascending: true });
+        .order("created_at", { ascending: true })
+        .order("id", { ascending: true });
       if (cancelled) return;
       const loaded: UIMessage[] = (data ?? []).map((row) => ({
         id: row.sdk_message_id ?? row.id,
@@ -190,6 +191,27 @@ export default function Workspace() {
     };
   }, [threadId, setMessages]);
 
+  // Save one message, idempotently (unique on thread_id + sdk_message_id).
+  const persistMessage = useCallback(
+    async (tid: string, m: UIMessage) => {
+      if (!user) return;
+      savedIds.current.add(m.id);
+      const { error: upsertError } = await supabase.from("chat_messages").upsert(
+        {
+          thread_id: tid,
+          user_id: user.id,
+          role: m.role,
+          parts: m.parts as unknown as never,
+          text_content: textOf(m),
+          sdk_message_id: m.id,
+        },
+        { onConflict: "thread_id,sdk_message_id" },
+      );
+      if (upsertError) savedIds.current.delete(m.id);
+    },
+    [user],
+  );
+
   // Persist finished messages
   useEffect(() => {
     if (!user || status === "streaming" || status === "submitted") return;
@@ -197,18 +219,8 @@ export default function Workspace() {
     if (!tid) return;
     const pending = messages.filter((m) => !savedIds.current.has(m.id));
     if (pending.length === 0) return;
-    pending.forEach((m) => savedIds.current.add(m.id));
     (async () => {
-      await supabase.from("chat_messages").insert(
-        pending.map((m) => ({
-          thread_id: tid,
-          user_id: user.id,
-          role: m.role,
-          parts: m.parts as unknown as never,
-          text_content: textOf(m),
-          sdk_message_id: m.id,
-        })),
-      );
+      for (const m of pending) await persistMessage(tid, m);
       await supabase
         .from("threads")
         .update({ updated_at: new Date().toISOString() })
@@ -216,7 +228,8 @@ export default function Workspace() {
       loadSidebar();
       loadArtifacts();
     })();
-  }, [messages, status, user, loadSidebar, loadArtifacts]);
+  }, [messages, status, user, loadSidebar, loadArtifacts, persistMessage]);
+
 
   const handleSubmit = async (message: PromptInputMessage) => {
     const text = message.text?.trim();
