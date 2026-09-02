@@ -216,6 +216,42 @@ export function WorkspaceSidebar({
         )}
       </ScrollArea>
 
+      {onDeleteEmptyThreads && (
+        <div className="border-t border-border p-2">
+          <Button
+            variant="ghost"
+            size="sm"
+            className="w-full justify-start gap-2 text-muted-foreground"
+            onClick={() => setCleaning(true)}
+          >
+            <Trash2 className="h-4 w-4" /> Excluir conversas vazias
+          </Button>
+        </div>
+      )}
+
+      <AlertDialog open={cleaning} onOpenChange={setCleaning}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Excluir conversas vazias?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Todas as conversas sem nenhuma mensagem salva serão apagadas.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                onDeleteEmptyThreads?.();
+                setCleaning(false);
+              }}
+            >
+              Excluir
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+
       <AlertDialog open={!!deletingId} onOpenChange={(o) => !o && setDeletingId(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
