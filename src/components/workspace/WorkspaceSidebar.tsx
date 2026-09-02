@@ -185,10 +185,11 @@ export function WorkspaceSidebar({
                       <DropdownMenuTrigger asChild>
                         <button
                           aria-label={`Opções de ${t.title}`}
-                          className="rounded p-1 text-muted-foreground opacity-0 transition-opacity hover:text-foreground focus:opacity-100 group-hover:opacity-100 data-[state=open]:opacity-100"
+                          className="rounded p-1 text-muted-foreground transition-colors hover:text-foreground"
                         >
                           <MoreHorizontal className="h-4 w-4" />
                         </button>
+
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end">
                         <DropdownMenuItem
