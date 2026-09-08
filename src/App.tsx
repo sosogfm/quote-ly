@@ -5,6 +5,8 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { AuthProvider } from "@/contexts/AuthContext";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
+import { AdminRoute } from "@/components/AdminRoute";
+
 
 import Landing from "./pages/Landing";
 import Login from "./pages/Login";
@@ -52,8 +54,9 @@ const App = () => (
             <Route path="/proposals/:id" element={<ProtectedRoute><ProposalDetail /></ProtectedRoute>} />
             <Route path="/proposals/:id/edit" element={<ProtectedRoute><ProposalBuilder /></ProtectedRoute>} />
             <Route path="/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
-            <Route path="/evolution" element={<ProtectedRoute><Evolution /></ProtectedRoute>} />
-            <Route path="/evolution/:id" element={<ProtectedRoute><EvolutionProposal /></ProtectedRoute>} />
+            <Route path="/evolution" element={<AdminRoute><Evolution /></AdminRoute>} />
+            <Route path="/evolution/:id" element={<AdminRoute><EvolutionProposal /></AdminRoute>} />
+
             <Route path="/p/:shareId" element={<PublicProposal />} />
             <Route path="*" element={<NotFound />} />
           </Routes>
