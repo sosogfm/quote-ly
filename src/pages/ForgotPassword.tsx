@@ -33,8 +33,9 @@ export default function ForgotPassword() {
           <Link to="/" className="mx-auto mb-4 flex h-10 w-10 items-center justify-center rounded-lg bg-primary">
             <FileText className="h-5 w-5 text-primary-foreground" />
           </Link>
-          <CardTitle className="font-display text-2xl">Reset password</CardTitle>
-          <CardDescription>{sent ? "Check your email for a reset link" : "Enter your email to receive a reset link"}</CardDescription>
+          <CardTitle className="font-display text-2xl">Definir / alterar senha</CardTitle>
+          <CardDescription>{sent ? "Veja o link enviado para o seu e-mail" : "Informe seu e-mail (inclusive o do Google) para receber um link e definir uma senha"}</CardDescription>
+
         </CardHeader>
         <CardContent className="space-y-4">
           {!sent ? (
