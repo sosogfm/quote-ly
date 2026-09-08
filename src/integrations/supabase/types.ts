@@ -1201,6 +1201,7 @@ export type Database = {
         Returns: boolean
       }
       hash_share_password: { Args: { _password: string }; Returns: string }
+      is_owner: { Args: { _user_id: string }; Returns: boolean }
       verify_share_password: {
         Args: { _password: string; _share_id: string }
         Returns: boolean

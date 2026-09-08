@@ -12,10 +12,13 @@ import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
 import { Building2, User, Users, Layers, Brain } from "lucide-react";
 import { MemorySettings } from "@/components/settings/MemorySettings";
+import { isOwnerEmail } from "@/lib/owner";
+
 
 export default function Settings() {
   const { user, role, organization, refreshOrg } = useAuth();
-  const isAdmin = role === "admin";
+  const isAdmin = role === "admin" && isOwnerEmail(user?.email);
+
 
   // Profile state
   const [fullName, setFullName] = useState("");

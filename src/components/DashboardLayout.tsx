@@ -8,13 +8,18 @@ import {
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { FileText, LayoutDashboard, Users, FolderOpen, PlusCircle, Settings, LogOut, User, ClipboardList, Menu, GitBranch, MessageSquare } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { isOwnerEmail } from "@/lib/owner";
 
-const navItems = [
+
+const baseNavItems = [
   { to: "/dashboard", icon: LayoutDashboard, label: "Dashboard" },
   { to: "/workspace", icon: MessageSquare, label: "Chat" },
   { to: "/proposals", icon: ClipboardList, label: "Proposals" },
   { to: "/clients", icon: Users, label: "Clients" },
   { to: "/templates", icon: FolderOpen, label: "Templates" },
+];
+
+const ownerNavItems = [
   { to: "/evolution", icon: GitBranch, label: "Evolução" },
 ];
 
@@ -23,6 +28,8 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
   const { user, signOut, organization } = useAuth();
   const navigate = useNavigate();
   const [mobileOpen, setMobileOpen] = useState(false);
+  const navItems = isOwnerEmail(user?.email) ? [...baseNavItems, ...ownerNavItems] : baseNavItems;
+
 
   const handleSignOut = async () => {
     await signOut();
