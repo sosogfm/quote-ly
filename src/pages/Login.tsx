@@ -70,9 +70,15 @@ export default function Login() {
               {loading ? "Signing in..." : "Sign in"}
             </Button>
           </form>
+          <p className="text-center text-xs text-muted-foreground">
+            Já entrou com o Google antes? Use{" "}
+            <Link to="/forgot-password" className="text-primary hover:underline">definir/alterar senha</Link>{" "}
+            com o mesmo e-mail do Google para criar uma senha e entrar sem o Google.
+          </p>
           <p className="text-center text-sm text-muted-foreground">
             Need an account? <Link to="/signup" className="text-primary hover:underline">Join your team</Link>
           </p>
+
         </CardContent>
       </Card>
     </div>
