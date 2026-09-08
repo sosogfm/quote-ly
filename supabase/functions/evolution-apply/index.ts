@@ -71,8 +71,8 @@ async function resolveAllContents(
 
   // Use streaming consumed server-side so long generations (many files) keep the
   // connection alive instead of being severed after ~2min of silence.
-  const text = await generateWithFallback({}, (model) =>
-    streamText({
+  const text = await generateWithFallback({}, async (model) => {
+    const result = streamText({
       model,
       system:
         "Você aplica patches em arquivos de código. Responda APENAS com um único objeto JSON válido " +
@@ -86,8 +86,10 @@ async function resolveAllContents(
         `Dados:\n${fileBlocks}`,
         `Devolva um JSON objeto com EXATAMENTE estas chaves: ${needAi.map((f) => `"${f.path}"`).join(", ")}.`,
       ].join("\n\n"),
-    }).then((r) => r.text),
-  );
+    });
+    return await result.text;
+  });
+
 
   let parsed: Record<string, string>;
   try {
