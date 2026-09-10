@@ -177,7 +177,7 @@ export type Database = {
           id: string
           parts: Json
           role: string
-          sdk_message_id: string | null
+          sdk_message_id: string
           text_content: string | null
           thread_id: string
           user_id: string
@@ -187,7 +187,7 @@ export type Database = {
           id?: string
           parts?: Json
           role: string
-          sdk_message_id?: string | null
+          sdk_message_id: string
           text_content?: string | null
           thread_id: string
           user_id: string
@@ -197,7 +197,7 @@ export type Database = {
           id?: string
           parts?: Json
           role?: string
-          sdk_message_id?: string | null
+          sdk_message_id?: string
           text_content?: string | null
           thread_id?: string
           user_id?: string
