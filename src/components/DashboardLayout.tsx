@@ -17,6 +17,7 @@ const baseNavItems = [
   { to: "/proposals", icon: ClipboardList, label: "Proposals" },
   { to: "/clients", icon: Users, label: "Clients" },
   { to: "/templates", icon: FolderOpen, label: "Templates" },
+  { to: "/showcase", icon: Globe, label: "Vitrine" },
 ];
 
 const ownerNavItems = [
