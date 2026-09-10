@@ -23,6 +23,7 @@ import ClientDetail from "./pages/ClientDetail";
 import Settings from "./pages/Settings";
 import PublicProposal from "./pages/PublicProposal";
 import Workspace from "./pages/Workspace";
+import Showcase from "./pages/Showcase";
 import Evolution from "./pages/Evolution";
 import EvolutionProposal from "./pages/EvolutionProposal";
 import NotFound from "./pages/NotFound";
