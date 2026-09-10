@@ -54,6 +54,7 @@ const App = () => (
             <Route path="/proposals/new" element={<ProtectedRoute><ProposalBuilder /></ProtectedRoute>} />
             <Route path="/proposals/:id" element={<ProtectedRoute><ProposalDetail /></ProtectedRoute>} />
             <Route path="/proposals/:id/edit" element={<ProtectedRoute><ProposalBuilder /></ProtectedRoute>} />
+            <Route path="/showcase" element={<ProtectedRoute><Showcase /></ProtectedRoute>} />
             <Route path="/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
             <Route path="/evolution" element={<AdminRoute><Evolution /></AdminRoute>} />
             <Route path="/evolution/:id" element={<AdminRoute><EvolutionProposal /></AdminRoute>} />
