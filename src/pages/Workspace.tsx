@@ -221,7 +221,11 @@ export default function Workspace() {
         },
         { onConflict: "thread_id,sdk_message_id" },
       );
-      if (upsertError) savedIds.current.delete(m.id);
+      if (upsertError) {
+        savedIds.current.delete(m.id);
+        console.error("Falha ao salvar mensagem", upsertError);
+        toast.error("Não foi possível salvar esta mensagem no histórico.");
+      }
     },
     [user],
   );
