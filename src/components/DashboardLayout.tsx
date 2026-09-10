@@ -6,7 +6,7 @@ import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
-import { FileText, LayoutDashboard, Users, FolderOpen, PlusCircle, Settings, LogOut, User, ClipboardList, Menu, GitBranch, MessageSquare } from "lucide-react";
+import { FileText, LayoutDashboard, Users, FolderOpen, PlusCircle, Settings, LogOut, User, ClipboardList, Menu, GitBranch, MessageSquare, Globe } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { isOwnerEmail } from "@/lib/owner";
 
@@ -17,6 +17,7 @@ const baseNavItems = [
   { to: "/proposals", icon: ClipboardList, label: "Proposals" },
   { to: "/clients", icon: Users, label: "Clients" },
   { to: "/templates", icon: FolderOpen, label: "Templates" },
+  { to: "/showcase", icon: Globe, label: "Vitrine" },
 ];
 
 const ownerNavItems = [

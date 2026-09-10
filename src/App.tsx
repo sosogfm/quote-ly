@@ -23,6 +23,7 @@ import ClientDetail from "./pages/ClientDetail";
 import Settings from "./pages/Settings";
 import PublicProposal from "./pages/PublicProposal";
 import Workspace from "./pages/Workspace";
+import Showcase from "./pages/Showcase";
 import Evolution from "./pages/Evolution";
 import EvolutionProposal from "./pages/EvolutionProposal";
 import NotFound from "./pages/NotFound";
@@ -53,6 +54,7 @@ const App = () => (
             <Route path="/proposals/new" element={<ProtectedRoute><ProposalBuilder /></ProtectedRoute>} />
             <Route path="/proposals/:id" element={<ProtectedRoute><ProposalDetail /></ProtectedRoute>} />
             <Route path="/proposals/:id/edit" element={<ProtectedRoute><ProposalBuilder /></ProtectedRoute>} />
+            <Route path="/showcase" element={<ProtectedRoute><Showcase /></ProtectedRoute>} />
             <Route path="/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
             <Route path="/evolution" element={<AdminRoute><Evolution /></AdminRoute>} />
             <Route path="/evolution/:id" element={<AdminRoute><EvolutionProposal /></AdminRoute>} />

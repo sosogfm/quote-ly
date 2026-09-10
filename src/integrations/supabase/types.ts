@@ -1007,6 +1007,45 @@ export type Database = {
           },
         ]
       }
+      showcase_sites: {
+        Row: {
+          created_at: string
+          description: string | null
+          id: string
+          image_url: string | null
+          sort_order: number
+          tags: string[]
+          title: string
+          updated_at: string
+          url: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          image_url?: string | null
+          sort_order?: number
+          tags?: string[]
+          title: string
+          updated_at?: string
+          url: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          image_url?: string | null
+          sort_order?: number
+          tags?: string[]
+          title?: string
+          updated_at?: string
+          url?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       templates: {
         Row: {
           category: Database["public"]["Enums"]["template_category"]
