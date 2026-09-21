@@ -35,6 +35,7 @@ import { Shimmer } from "@/components/ai-elements/shimmer";
 import { AiProviderSelect } from "@/components/AiProviderSelect";
 import { ArtifactsPanel } from "@/components/workspace/ArtifactsPanel";
 import { extractFileText, isImage } from "@/lib/fileExtract";
+import { compressImageToDataUrl } from "@/lib/imageCompress";
 import type { ArtifactLike } from "@/lib/artifactDownload";
 import { Button } from "@/components/ui/button";
 import { Paperclip, PanelRight, Plus, Sparkles, X } from "lucide-react";
