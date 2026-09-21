@@ -451,8 +451,17 @@ export default function Workspace() {
 
             ) : (
               messages.map((m) => (
-                <Message from={m.role} key={m.id}>
-                  <MessageContent>
+                <Message from={m.role} key={m.id} className="mb-6">
+                  <div className="mb-1 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+                    {m.role === "user" ? "Você" : "IA"}
+                  </div>
+                  <MessageContent
+                    className={
+                      m.role === "assistant"
+                        ? "rounded-lg border border-border bg-muted/40 px-4 py-3"
+                        : undefined
+                    }
+                  >
                     {m.parts.map((part, i) => {
                       if (part.type === "text") {
                         return (
