@@ -242,6 +242,37 @@ Deno.serve(async (req) => {
       )
     );
 
+    // Validate image attachments up front so an oversized/unsupported upload
+    // returns a clear error instead of a raw 400 from the provider.
+    const MAX_IMAGE_BYTES = 3 * 1024 * 1024;
+    const ALLOWED_IMAGE_TYPES = ["image/jpeg", "image/png", "image/webp", "image/gif"];
+    for (const m of messages) {
+      if (!Array.isArray(m.parts)) continue;
+      for (const p of m.parts) {
+        const part = p as { type?: string; mediaType?: string; url?: string };
+        if (part.type !== "file") continue;
+        const mediaType = (part.mediaType ?? "").toLowerCase();
+        if (!mediaType.startsWith("image/")) continue;
+        if (!ALLOWED_IMAGE_TYPES.includes(mediaType)) {
+          return new Response(
+            JSON.stringify({ error: `Formato de imagem não suportado: ${mediaType}. Use JPEG, PNG ou WebP.` }),
+            { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+          );
+        }
+        const url = part.url ?? "";
+        const base64 = url.includes(",") ? url.slice(url.indexOf(",") + 1) : url;
+        const bytes = Math.floor(base64.replace(/\s/g, "").length * 0.75);
+        if (bytes > MAX_IMAGE_BYTES) {
+          return new Response(
+            JSON.stringify({
+              error: "Imagem muito grande para análise. Envie uma versão menor (até 3 MB).",
+            }),
+            { status: 413, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+          );
+        }
+      }
+    }
+
     const chainFetch = await createChainFallbackFetch({
       fetch: runIdFetch.fetch as typeof fetch,
       requireVision: hasImage,

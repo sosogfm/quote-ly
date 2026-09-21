@@ -35,6 +35,7 @@ import { Shimmer } from "@/components/ai-elements/shimmer";
 import { AiProviderSelect } from "@/components/AiProviderSelect";
 import { ArtifactsPanel } from "@/components/workspace/ArtifactsPanel";
 import { extractFileText, isImage } from "@/lib/fileExtract";
+import { compressImageToDataUrl } from "@/lib/imageCompress";
 import type { ArtifactLike } from "@/lib/artifactDownload";
 import { Button } from "@/components/ui/button";
 import { Paperclip, PanelRight, Plus, Sparkles, X } from "lucide-react";
@@ -43,14 +44,6 @@ const CHAT_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/chat`;
 const AI_STATUS_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/ai-status`;
 
 
-function fileToDataUrl(file: File) {
-  return new Promise<string>((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => resolve(reader.result as string);
-    reader.onerror = () => reject(new Error(`Falha ao ler ${file.name}`));
-    reader.readAsDataURL(file);
-  });
-}
 
 function textOf(message: UIMessage) {
   return message.parts
@@ -173,11 +166,13 @@ export default function Workspace() {
     let cancelled = false;
     savedIds.current = new Set();
 
-    if (!tid) {
-      setMessagesRef.current([]);
-      setInitialMessages([]);
-      return;
-    }
+    // Isolate conversations: never show the previous thread's messages while
+    // the new history is still loading.
+    setMessagesRef.current([]);
+    setInitialMessages([]);
+
+    if (!tid) return;
+
 
     (async () => {
       setLoadingThread(true);
@@ -296,14 +291,22 @@ export default function Workspace() {
       }
     }
 
-    const imageParts: FileUIPart[] = await Promise.all(
-      images.map(async (f) => ({
-        type: "file" as const,
-        mediaType: f.type,
-        filename: f.name,
-        url: await fileToDataUrl(f),
-      })),
-    );
+    // Images are downscaled/recompressed so the request body stays small
+    // enough for the backend (large photos returned HTTP 400 before).
+    let imageParts: FileUIPart[] = [];
+    try {
+      imageParts = await Promise.all(
+        images.map(async (f) => ({
+          type: "file" as const,
+          mediaType: "image/jpeg",
+          filename: f.name.replace(/\.[^.]+$/, "") + ".jpg",
+          url: await compressImageToDataUrl(f),
+        })),
+      );
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Falha ao preparar a imagem.");
+      return;
+    }
 
     pendingFiles.current = [];
     setAttachedNames([]);
@@ -419,7 +422,9 @@ export default function Workspace() {
           </Button>
         </div>
 
-        <Conversation className="flex-1">
+        {/* key forces a clean remount per conversation: no leftover scroll or
+            rendered messages from the previous thread. */}
+        <Conversation className="flex-1" key={threadId ?? "empty"}>
           <ConversationContent className="mx-auto w-full max-w-3xl">
             {messages.length === 0 && !loadingThread ? (
               <ConversationEmptyState icon={<Sparkles className="h-6 w-6" />}>
