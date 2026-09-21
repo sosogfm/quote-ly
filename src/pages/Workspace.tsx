@@ -422,7 +422,9 @@ export default function Workspace() {
           </Button>
         </div>
 
-        <Conversation className="flex-1">
+        {/* key forces a clean remount per conversation: no leftover scroll or
+            rendered messages from the previous thread. */}
+        <Conversation className="flex-1" key={threadId ?? "empty"}>
           <ConversationContent className="mx-auto w-full max-w-3xl">
             {messages.length === 0 && !loadingThread ? (
               <ConversationEmptyState icon={<Sparkles className="h-6 w-6" />}>
