@@ -44,14 +44,6 @@ const CHAT_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/chat`;
 const AI_STATUS_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/ai-status`;
 
 
-function fileToDataUrl(file: File) {
-  return new Promise<string>((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => resolve(reader.result as string);
-    reader.onerror = () => reject(new Error(`Falha ao ler ${file.name}`));
-    reader.readAsDataURL(file);
-  });
-}
 
 function textOf(message: UIMessage) {
   return message.parts
