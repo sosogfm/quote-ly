@@ -173,11 +173,13 @@ export default function Workspace() {
     let cancelled = false;
     savedIds.current = new Set();
 
-    if (!tid) {
-      setMessagesRef.current([]);
-      setInitialMessages([]);
-      return;
-    }
+    // Isolate conversations: never show the previous thread's messages while
+    // the new history is still loading.
+    setMessagesRef.current([]);
+    setInitialMessages([]);
+
+    if (!tid) return;
+
 
     (async () => {
       setLoadingThread(true);
