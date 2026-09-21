@@ -298,14 +298,22 @@ export default function Workspace() {
       }
     }
 
-    const imageParts: FileUIPart[] = await Promise.all(
-      images.map(async (f) => ({
-        type: "file" as const,
-        mediaType: f.type,
-        filename: f.name,
-        url: await fileToDataUrl(f),
-      })),
-    );
+    // Images are downscaled/recompressed so the request body stays small
+    // enough for the backend (large photos returned HTTP 400 before).
+    let imageParts: FileUIPart[] = [];
+    try {
+      imageParts = await Promise.all(
+        images.map(async (f) => ({
+          type: "file" as const,
+          mediaType: "image/jpeg",
+          filename: f.name.replace(/\.[^.]+$/, "") + ".jpg",
+          url: await compressImageToDataUrl(f),
+        })),
+      );
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Falha ao preparar a imagem.");
+      return;
+    }
 
     pendingFiles.current = [];
     setAttachedNames([]);
